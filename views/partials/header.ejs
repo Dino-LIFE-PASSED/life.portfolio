@@ -90,6 +90,7 @@
           </div>
           <p class="form-hint" id="bgGifHint">URL or upload GIF/image from your device</p>
         </div>
+        <p id="profileSaveError" style="color:#ff4560;font-size:13px;min-height:18px;"></p>
         <div class="modal-actions">
           <button type="button" class="btn btn-ghost" onclick="document.getElementById('profileModal').classList.add('hidden')">Cancel</button>
           <button type="submit" class="btn btn-primary">Save</button>
@@ -100,80 +101,80 @@
 
   <script>
   (function() {
-    function fileToBase64(file) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = e => resolve(e.target.result);
-        reader.onerror = reject;
+    // Store uploaded data URLs directly in JS — never rely on input.value for large binary
+    var uploadedProfile = null;
+    var uploadedBg = null;
+
+    function bindFileUpload(fileInputId, hintId, onDone) {
+      var fileInput = document.getElementById(fileInputId);
+      var hint = document.getElementById(hintId);
+      if (!fileInput) return;
+      fileInput.addEventListener('change', function() {
+        var file = fileInput.files[0];
+        if (!file) return;
+        hint.textContent = 'Loading…';
+        var reader = new FileReader();
+        reader.onload = function(e) {
+          onDone(e.target.result);
+          hint.textContent = '✓ ' + file.name + ' (' + (file.size / 1024).toFixed(0) + ' KB) ready — click Save';
+        };
+        reader.onerror = function() { hint.textContent = 'Failed to read file'; };
         reader.readAsDataURL(file);
       });
     }
 
-    function bindFileUpload(fileInputId, textInputId, hintId) {
-      const fileInput = document.getElementById(fileInputId);
-      const textInput = document.getElementById(textInputId);
-      const hint = document.getElementById(hintId);
-      if (!fileInput) return;
-      fileInput.addEventListener('change', async () => {
-        const file = fileInput.files[0];
-        if (!file) return;
-        hint.textContent = 'Loading...';
-        try {
-          const dataUrl = await fileToBase64(file);
-          textInput.value = dataUrl;
-          hint.textContent = '✓ ' + file.name + ' ready — click Save';
-        } catch (_) {
-          hint.textContent = 'Failed to load file';
-        }
-      });
-    }
+    bindFileUpload('profileImageFile', 'profileImageHint', function(url) { uploadedProfile = url; });
+    bindFileUpload('bgGifFile', 'bgGifHint', function(url) { uploadedBg = url; });
 
-    async function resolveUrl(input, hintEl) {
-      const val = input.value.trim();
+    // URL blur resolve (only for text input, not file uploads)
+    function resolveUrl(input, hintEl) {
+      var val = input.value.trim();
       if (!val || val.startsWith('data:')) return;
-      hintEl.textContent = 'Resolving...';
-      try {
-        const r = await fetch('/api/resolve-image?url=' + encodeURIComponent(val));
-        const d = await r.json();
-        if (d.resolvedUrl && d.resolvedUrl !== val) {
-          input.value = d.resolvedUrl;
-          hintEl.textContent = '✓ Resolved';
-        } else {
-          hintEl.textContent = '✓ URL looks good';
-        }
-      } catch (_) {
-        hintEl.textContent = 'Saved as-is';
-      }
+      hintEl.textContent = 'Resolving…';
+      fetch('/api/resolve-image?url=' + encodeURIComponent(val))
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.resolvedUrl && d.resolvedUrl !== val) { input.value = d.resolvedUrl; hintEl.textContent = '✓ Resolved'; }
+          else hintEl.textContent = '✓ URL looks good';
+        })
+        .catch(function() { hintEl.textContent = 'Saved as-is'; });
     }
 
-    bindFileUpload('profileImageFile', 'profileImageInput', 'profileImageHint');
-    bindFileUpload('bgGifFile', 'bgGifInput', 'bgGifHint');
+    var profileInput = document.getElementById('profileImageInput');
+    var bgInput = document.getElementById('bgGifInput');
+    if (profileInput) profileInput.addEventListener('blur', function() { resolveUrl(profileInput, document.getElementById('profileImageHint')); });
+    if (bgInput) bgInput.addEventListener('blur', function() { resolveUrl(bgInput, document.getElementById('bgGifHint')); });
 
-    // Submit as JSON so base64 '+' characters are never corrupted by URL-encoding
-    document.getElementById('profileForm').addEventListener('submit', async function(e) {
+    document.getElementById('profileForm').addEventListener('submit', function(e) {
       e.preventDefault();
-      const profileUrl = document.getElementById('profileImageInput').value;
-      const bgUrl = document.getElementById('bgGifInput').value;
-      const saveBtn = this.querySelector('button[type="submit"]');
-      if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
-      try {
-        const r = await fetch('/profile', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ profile_image_url: profileUrl, bg_gif_url: bgUrl }),
-        });
-        const d = await r.json();
-        if (d.ok) window.location.href = '/?success=Profile+updated';
-        else { if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save'; } }
-      } catch (_) {
-        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save'; }
-      }
-    });
+      // Priority: uploaded file > text input URL > nothing (server keeps existing)
+      var profileUrl = uploadedProfile || (profileInput ? profileInput.value.trim() : '');
+      var bgUrl = uploadedBg || (bgInput ? bgInput.value.trim() : '');
 
-    const profileInput = document.getElementById('profileImageInput');
-    const bgInput = document.getElementById('bgGifInput');
-    if (profileInput) profileInput.addEventListener('blur', () => resolveUrl(profileInput, document.getElementById('profileImageHint')));
-    if (bgInput) bgInput.addEventListener('blur', () => resolveUrl(bgInput, document.getElementById('bgGifHint')));
+      var saveBtn = document.querySelector('#profileForm button[type="submit"]');
+      var errEl = document.getElementById('profileSaveError');
+      if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
+      if (errEl) errEl.textContent = '';
+
+      fetch('/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile_image_url: profileUrl, bg_gif_url: bgUrl }),
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.ok) {
+          window.location.href = '/?success=Profile+updated';
+        } else {
+          if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save'; }
+          if (errEl) errEl.textContent = 'Save failed — try again';
+        }
+      })
+      .catch(function(err) {
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save'; }
+        if (errEl) errEl.textContent = 'Error: ' + err.message;
+      });
+    });
   })();
   </script>
   <% } %>
