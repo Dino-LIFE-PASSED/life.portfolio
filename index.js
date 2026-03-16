@@ -66,7 +66,7 @@ async function scanXpub(xpubStr) {
     const address = xpubToAddress(child.publicKey, type);
 
     try {
-      const r = await fetch(`https://mempool.space/api/address/${address}`);
+      const r = await fetch(`https://blockstream.info/api/address/${address}`);
       if (r.status === 429) {
         // Rate limited — wait longer and retry same index
         await sleep(2000);
@@ -396,8 +396,8 @@ app.get('/api/wallets', requireAuth, async (req, res) => {
 
   let btcUsd = null;
   try {
-    const r = await fetch('https://mempool.space/api/v1/prices');
-    if (r.ok) btcUsd = (await r.json()).USD;
+    const r = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd');
+    if (r.ok) btcUsd = (await r.json()).bitcoin.usd;
   } catch (_) {}
 
   const now = new Date().toISOString();
@@ -411,7 +411,7 @@ app.get('/api/wallets', requireAuth, async (req, res) => {
         unconfirmed = 0;
       } else {
         // Single address
-        const r = await fetch(`https://mempool.space/api/address/${w.address}`);
+        const r = await fetch(`https://blockstream.info/api/address/${w.address}`);
         if (!r.ok) throw new Error('HTTP ' + r.status);
         const d = await r.json();
         btc = (d.chain_stats.funded_txo_sum - d.chain_stats.spent_txo_sum) / 1e8;
