@@ -173,8 +173,9 @@
               <form action="/wallet/delete/<%= w.id %>" method="POST" onsubmit="return confirm('Remove <%= w.label %>?')" style="display:inline">
                 <button type="submit" class="btn-delete" title="Remove">&#10005;</button>
               </form>
+              <button class="btn-edit" title="Edit" onclick="openWalletEdit(<%= w.id %>, '<%= w.label.replace(/'/g, "\\'") %>')">&#9998;</button>
             </td>
-            <td class="asset-name"><%= w.label %></td>
+            <td class="asset-name" id="wallet-label-<%= w.id %>"><%= w.label %></td>
             <td>
               <% if (/^[xyz]pub/.test(w.address)) { %>
                 <span class="ticker-badge" title="<%= w.address %>">xPub ···<%= w.address.slice(-6) %></span>
@@ -182,10 +183,10 @@
                 <span class="wallet-addr"><%= w.address.slice(0,8) %>…<%= w.address.slice(-6) %></span>
               <% } %>
             </td>
-            <% var isXpubWallet = /^[xyz]pub/.test(w.address); %>
-            <td class="num cell-btc-balance"><%= w.btc_balance != null ? w.btc_balance.toFixed(8) : (isXpubWallet ? 'Scanning…' : '—') %></td>
+            <% var neverScanned = /^[xyz]pub/.test(w.address) && w.btc_balance == null; %>
+            <td class="num cell-btc-balance"><%= w.btc_balance != null ? w.btc_balance.toFixed(8) : (neverScanned ? 'Scanning…' : '—') %></td>
             <td class="num cell-btc-unconfirmed" style="color:var(--text-dim)"><%= w.btc_unconfirmed != null ? w.btc_unconfirmed.toFixed(8) : '—' %></td>
-            <td class="num cell-wallet-usd"><%= w.usd_value != null ? '$' + w.usd_value.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) : (isXpubWallet ? 'Scanning…' : '—') %></td>
+            <td class="num cell-wallet-usd"><%= w.usd_value != null ? '$' + w.usd_value.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) : (neverScanned ? 'Scanning…' : '—') %></td>
           </tr>
           <% }); %>
         </tbody>
@@ -430,7 +431,68 @@ window._currency = { showThb: false, usdToThb: null };
 
   refreshPrices();
   refreshWallets();
+
+  // Strip ?success / ?error from URL so reloading doesn't re-show the alert
+  if (window.location.search) history.replaceState(null, '', window.location.pathname);
 })();
+</script>
+
+<!-- Wallet Edit Modal -->
+<div id="walletEditModal" class="modal-overlay hidden" onclick="if(event.target===this)this.classList.add('hidden')">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2 class="modal-title">Edit Wallet</h2>
+      <button class="modal-close" onclick="document.getElementById('walletEditModal').classList.add('hidden')">&#10005;</button>
+    </div>
+    <form id="walletEditForm" class="modal-form">
+      <input type="hidden" id="walletEditId" />
+      <div class="form-group">
+        <label class="form-label">Label</label>
+        <input type="text" id="walletEditLabel" class="form-input" placeholder="e.g. Cold Wallet" required />
+      </div>
+      <p id="walletEditError" style="color:#ff4560;font-size:13px;min-height:18px;"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('walletEditModal').classList.add('hidden')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openWalletEdit(id, label) {
+  document.getElementById('walletEditId').value = id;
+  document.getElementById('walletEditLabel').value = label;
+  document.getElementById('walletEditError').textContent = '';
+  document.getElementById('walletEditModal').classList.remove('hidden');
+  document.getElementById('walletEditLabel').focus();
+}
+
+document.getElementById('walletEditForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const id = document.getElementById('walletEditId').value;
+  const label = document.getElementById('walletEditLabel').value.trim();
+  const btn = this.querySelector('button[type="submit"]');
+  const err = document.getElementById('walletEditError');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const r = await fetch(`/wallet/edit/${id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label }),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      document.getElementById(`wallet-label-${id}`).textContent = label;
+      document.getElementById('walletEditModal').classList.add('hidden');
+    } else {
+      err.textContent = d.error || 'Save failed';
+    }
+  } catch (ex) {
+    err.textContent = 'Error: ' + ex.message;
+  }
+  btn.disabled = false; btn.textContent = 'Save';
+});
 </script>
 
 <%- include('partials/footer') %>

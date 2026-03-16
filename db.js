@@ -151,6 +151,10 @@ async function addWallet(userId, label, address) {
   );
 }
 
+async function updateWalletLabel(id, userId, label) {
+  await pool.query('UPDATE wallets SET label=$1 WHERE id=$2 AND user_id=$3', [label, id, userId]);
+}
+
 async function deleteWallet(id, userId) {
   await pool.query('DELETE FROM wallets WHERE id = $1 AND user_id = $2', [id, userId]);
 }
@@ -167,5 +171,5 @@ module.exports = {
   initDb,
   createUser, getUserByUsername, updateUserProfile,
   getAllAssets, getAssetById, addAsset, updateAsset, deleteAsset, updatePrice,
-  getAllWallets, addWallet, deleteWallet, updateWalletBalance,
+  getAllWallets, addWallet, updateWalletLabel, deleteWallet, updateWalletBalance,
 };

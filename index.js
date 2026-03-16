@@ -9,7 +9,7 @@ const bs58check = require('bs58check');
 const { bech32 } = require('bech32');
 const { pool, initDb, createUser, getUserByUsername, updateUserProfile,
         getAllAssets, getAssetById, addAsset, updateAsset, deleteAsset, updatePrice,
-        getAllWallets, addWallet, deleteWallet, updateWalletBalance } = require('./db');
+        getAllWallets, addWallet, updateWalletLabel, deleteWallet, updateWalletBalance } = require('./db');
 
 // ─── xPub address derivation ─────────────────────────────────────────────────
 
@@ -440,6 +440,14 @@ app.post('/wallet/add', requireAuth, async (req, res) => {
       : 'Failed+to+add+wallet';
     res.redirect('/?error=' + msg);
   }
+});
+
+// POST /wallet/edit/:id
+app.post('/wallet/edit/:id', requireAuth, async (req, res) => {
+  const { label } = req.body;
+  if (!label || !label.trim()) return res.json({ ok: false, error: 'Label is required' });
+  await updateWalletLabel(parseInt(req.params.id, 10), req.session.userId, label.trim());
+  res.json({ ok: true });
 });
 
 // POST /wallet/delete/:id
