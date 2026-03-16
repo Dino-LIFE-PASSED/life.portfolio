@@ -47,6 +47,8 @@ function isXpub(str) {
   return /^[xyz]pub/.test(str);
 }
 
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
 async function scanXpub(xpubStr) {
   const type = xpubStr.slice(0, 4); // xpub, ypub, zpub
   const normalized = (type === 'xpub') ? xpubStr : normalizeXpub(xpubStr);
@@ -57,6 +59,7 @@ async function scanXpub(xpubStr) {
   let gap = 0;
   let index = 0;
   let totalSats = 0;
+  let retries = 0;
 
   while (gap < GAP_LIMIT) {
     const child = external.deriveChild(index);
@@ -64,6 +67,11 @@ async function scanXpub(xpubStr) {
 
     try {
       const r = await fetch(`https://mempool.space/api/address/${address}`);
+      if (r.status === 429) {
+        // Rate limited — wait longer and retry same index
+        await sleep(2000);
+        continue;
+      }
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const d = await r.json();
       const txCount = d.chain_stats.tx_count + d.mempool_stats.tx_count;
@@ -75,11 +83,19 @@ async function scanXpub(xpubStr) {
         gap = 0;
         totalSats += balance;
       }
+      retries = 0;
     } catch (err) {
       console.error(`xpub scan error at index ${index}:`, err.message);
-      gap++;
+      retries++;
+      if (retries >= 3) {
+        // Too many failures — give up scanning, return what we have
+        break;
+      }
+      await sleep(1000);
+      continue; // retry same index
     }
     index++;
+    await sleep(150); // 150ms between requests to avoid rate limiting
   }
 
   return totalSats / 1e8; // satoshis → BTC
