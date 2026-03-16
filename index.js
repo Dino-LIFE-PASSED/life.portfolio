@@ -601,6 +601,18 @@ initDb()
     app.listen(PORT, () => {
       console.log(`Portfolio tracker running at http://localhost:${PORT}`);
     });
+
+    // Reclaim space from overwritten base64 image blobs every hour
+    async function vacuumImages() {
+      try {
+        await pool.query('VACUUM ANALYZE users');
+        console.log('[vacuum] users table cleaned');
+      } catch (err) {
+        console.error('[vacuum] error:', err.message);
+      }
+    }
+    vacuumImages(); // run once on startup to clear any existing bloat
+    setInterval(vacuumImages, 60 * 60 * 1000); // then every hour
   })
   .catch((err) => {
     console.error('Failed to initialize database:', err);

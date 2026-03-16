@@ -802,6 +802,7 @@ input[type="number"]::-webkit-outer-spin-button {
   padding: 0 8px;
 }
 
+
 .btn-logout {
   background: transparent;
   border: 1px solid var(--border);
