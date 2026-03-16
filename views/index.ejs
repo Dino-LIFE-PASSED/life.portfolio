@@ -395,6 +395,11 @@ window._hasBtcAsset = <%- JSON.stringify(hasBtcAsset) %>;
       cardRetPct.textContent = fmtPct(retPct);
       cardRetPct.className = 'card-value ' + (retPct >= 0 ? 'positive' : 'negative');
     }
+
+    // Live tab title — shows total return so you can monitor at a glance
+    if (totalInvested > 0) {
+      document.title = fmtReturn(retDollar) + ' (' + fmtPct(retPct) + ') · life.portfolio';
+    }
   }
 
   // ─── Price polling ────────────────────────────────────────────────────────
