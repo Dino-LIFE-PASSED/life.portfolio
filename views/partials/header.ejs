@@ -18,6 +18,12 @@
     <div class="nav-links">
       <a href="/" class="nav-link <%= typeof activePage !== 'undefined' && activePage === 'dashboard' ? 'active' : '' %>">Dashboard</a>
       <a href="/add" class="nav-link btn-nav <%= typeof activePage !== 'undefined' && activePage === 'add' ? 'active' : '' %>">+ Add Asset</a>
+      <% if (typeof username !== 'undefined' && username) { %>
+        <span class="nav-user">&#128100; <%= username %></span>
+        <form method="POST" action="/logout" style="display:inline;">
+          <button type="submit" class="btn-logout">Logout</button>
+        </form>
+      <% } %>
     </div>
   </nav>
   <main class="container">

@@ -1,6 +1,10 @@
 const express = require('express');
 const path = require('path');
-const { initDb, getAllAssets, getAssetById, addAsset, updateAsset, deleteAsset, updatePrice,
+const bcrypt = require('bcrypt');
+const session = require('express-session');
+const pgSession = require('connect-pg-simple')(session);
+const { pool, initDb, createUser, getUserByUsername,
+        getAllAssets, getAssetById, addAsset, updateAsset, deleteAsset, updatePrice,
         getAllWallets, addWallet, deleteWallet, updateWalletBalance } = require('./db');
 
 const app = express();
@@ -14,6 +18,25 @@ app.set('views', path.join(__dirname, 'views'));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Session
+app.use(session({
+  store: new pgSession({ pool, createTableIfMissing: true }),
+  secret: process.env.SESSION_SECRET || 'change-this-secret',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days — stay logged in
+    httpOnly: true,
+  },
+}));
+
+// ─── Auth middleware ─────────────────────────────────────────────────────────
+
+function requireAuth(req, res, next) {
+  if (req.session.userId) return next();
+  res.redirect('/login');
+}
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -56,48 +79,106 @@ function computeStats(assets) {
   };
 }
 
-// ─── Routes ─────────────────────────────────────────────────────────────────
+// ─── Auth routes ─────────────────────────────────────────────────────────────
+
+// GET /login
+app.get('/login', (req, res) => {
+  if (req.session.userId) return res.redirect('/');
+  res.render('login', { error: null });
+});
+
+// POST /login
+app.post('/login', async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password)
+    return res.render('login', { error: 'Username and password are required.' });
+
+  const user = await getUserByUsername(username.trim().toLowerCase());
+  if (!user) return res.render('login', { error: 'Invalid username or password.' });
+
+  const match = await bcrypt.compare(password, user.password_hash);
+  if (!match) return res.render('login', { error: 'Invalid username or password.' });
+
+  req.session.userId = user.id;
+  req.session.username = user.username;
+  res.redirect('/');
+});
+
+// GET /register
+app.get('/register', (req, res) => {
+  if (req.session.userId) return res.redirect('/');
+  res.render('register', { error: null });
+});
+
+// POST /register
+app.post('/register', async (req, res) => {
+  const { username, password, confirm } = req.body;
+
+  if (!username || !password || !confirm)
+    return res.render('register', { error: 'All fields are required.' });
+  if (password !== confirm)
+    return res.render('register', { error: 'Passwords do not match.' });
+  if (password.length < 6)
+    return res.render('register', { error: 'Password must be at least 6 characters.' });
+
+  const existing = await getUserByUsername(username.trim().toLowerCase());
+  if (existing)
+    return res.render('register', { error: 'Username already taken.' });
+
+  const passwordHash = await bcrypt.hash(password, 12);
+  const user = await createUser(username.trim().toLowerCase(), passwordHash);
+
+  req.session.userId = user.id;
+  req.session.username = user.username;
+  res.redirect('/');
+});
+
+// POST /logout
+app.post('/logout', (req, res) => {
+  req.session.destroy(() => res.redirect('/login'));
+});
+
+// ─── Protected routes ────────────────────────────────────────────────────────
 
 // GET / — Dashboard
-app.get('/', async (req, res) => {
-  const assets = await getAllAssets();
+app.get('/', requireAuth, async (req, res) => {
+  const assets = await getAllAssets(req.session.userId);
   const { enriched, summary, chart } = computeStats(assets);
-  const wallets = await getAllWallets();
+  const wallets = await getAllWallets(req.session.userId);
   res.render('index', {
     assets: enriched,
     summary,
     chart,
     wallets,
+    username: req.session.username,
     error: req.query.error || null,
     success: req.query.success || null,
   });
 });
 
-// GET /add — Add asset form
-app.get('/add', (_req, res) => {
+// GET /add
+app.get('/add', requireAuth, (_req, res) => {
   res.render('add', { error: null, formData: {} });
 });
 
-// POST /add — Insert new asset
-app.post('/add', async (req, res) => {
+// POST /add
+app.post('/add', requireAuth, async (req, res) => {
   const { name, ticker, asset_type, quantity, buy_price } = req.body;
 
   const errors = [];
   if (!name || name.trim() === '') errors.push('Asset name is required.');
   if (!ticker || ticker.trim() === '') errors.push('Ticker symbol is required.');
-  if (!['stock', 'crypto', 'etf'].includes(asset_type))
-    errors.push('Invalid asset type.');
+  if (!['stock', 'crypto', 'etf'].includes(asset_type)) errors.push('Invalid asset type.');
   if (!quantity || isNaN(parseFloat(quantity)) || parseFloat(quantity) <= 0)
     errors.push('Quantity must be a positive number.');
   if (!buy_price || isNaN(parseFloat(buy_price)) || parseFloat(buy_price) <= 0)
     errors.push('Buy price must be a positive number.');
 
-  if (errors.length > 0) {
+  if (errors.length > 0)
     return res.render('add', { error: errors.join(' '), formData: req.body });
-  }
 
   try {
-    await addAsset({
+    await addAsset(req.session.userId, {
       name: name.trim(),
       ticker: ticker.trim().toUpperCase(),
       asset_type,
@@ -108,42 +189,38 @@ app.post('/add', async (req, res) => {
     res.redirect('/?success=Asset+added+successfully');
   } catch (err) {
     console.error('Error adding asset:', err);
-    res.render('add', {
-      error: 'Failed to save asset. Please try again.',
-      formData: req.body,
-    });
+    res.render('add', { error: 'Failed to save asset. Please try again.', formData: req.body });
   }
 });
 
-// GET /edit/:id — Edit asset form
-app.get('/edit/:id', async (req, res) => {
-  const asset = await getAssetById(parseInt(req.params.id, 10));
+// GET /edit/:id
+app.get('/edit/:id', requireAuth, async (req, res) => {
+  const asset = await getAssetById(parseInt(req.params.id, 10), req.session.userId);
   if (!asset) return res.redirect('/?error=Asset+not+found');
   res.render('edit', { error: null, asset });
 });
 
-// POST /edit/:id — Save edited asset
-app.post('/edit/:id', async (req, res) => {
+// POST /edit/:id
+app.post('/edit/:id', requireAuth, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const { name, ticker, asset_type, quantity, buy_price } = req.body;
 
   const errors = [];
   if (!name || name.trim() === '') errors.push('Asset name is required.');
   if (!ticker || ticker.trim() === '') errors.push('Ticker symbol is required.');
-  if (!['stock', 'crypto', 'etf'].includes(asset_type))
-    errors.push('Invalid asset type.');
+  if (!['stock', 'crypto', 'etf'].includes(asset_type)) errors.push('Invalid asset type.');
   if (!quantity || isNaN(parseFloat(quantity)) || parseFloat(quantity) <= 0)
     errors.push('Quantity must be a positive number.');
   if (!buy_price || isNaN(parseFloat(buy_price)) || parseFloat(buy_price) <= 0)
     errors.push('Buy price must be a positive number.');
 
   if (errors.length > 0) {
-    const asset = await getAssetById(id);
+    const asset = await getAssetById(id, req.session.userId);
     return res.render('edit', { error: errors.join(' '), asset: { ...asset, ...req.body, id } });
   }
 
   try {
-    await updateAsset(id, {
+    await updateAsset(id, req.session.userId, {
       name: name.trim(),
       ticker: ticker.trim().toUpperCase(),
       asset_type,
@@ -157,11 +234,10 @@ app.post('/edit/:id', async (req, res) => {
   }
 });
 
-// POST /delete/:id — Remove an asset
-app.post('/delete/:id', async (req, res) => {
-  const { id } = req.params;
+// POST /delete/:id
+app.post('/delete/:id', requireAuth, async (req, res) => {
   try {
-    await deleteAsset(parseInt(id, 10));
+    await deleteAsset(parseInt(req.params.id, 10), req.session.userId);
     res.redirect('/?success=Asset+deleted');
   } catch (err) {
     console.error('Error deleting asset:', err);
@@ -170,11 +246,11 @@ app.post('/delete/:id', async (req, res) => {
 });
 
 // POST /wallet/add
-app.post('/wallet/add', async (req, res) => {
+app.post('/wallet/add', requireAuth, async (req, res) => {
   const { label, address } = req.body;
   if (!label || !address) return res.redirect('/?error=Label+and+address+required');
   try {
-    await addWallet(label.trim(), address.trim());
+    await addWallet(req.session.userId, label.trim(), address.trim());
     res.redirect('/?success=Wallet+added');
   } catch (err) {
     const msg = err.message.includes('unique') || err.message.includes('UNIQUE')
@@ -185,18 +261,17 @@ app.post('/wallet/add', async (req, res) => {
 });
 
 // POST /wallet/delete/:id
-app.post('/wallet/delete/:id', async (req, res) => {
-  await deleteWallet(parseInt(req.params.id, 10));
+app.post('/wallet/delete/:id', requireAuth, async (req, res) => {
+  await deleteWallet(parseInt(req.params.id, 10), req.session.userId);
   res.redirect('/?success=Wallet+removed');
 });
 
-// GET /api/wallets — fetch balances from mempool.space
-app.get('/api/wallets', async (_req, res) => {
+// GET /api/wallets
+app.get('/api/wallets', requireAuth, async (req, res) => {
   res.set('Cache-Control', 'no-store');
-  const wallets = await getAllWallets();
+  const wallets = await getAllWallets(req.session.userId);
   if (wallets.length === 0) return res.json([]);
 
-  // Get BTC price from mempool
   let btcUsd = null;
   try {
     const r = await fetch('https://mempool.space/api/v1/prices');
@@ -236,10 +311,10 @@ async function fetchPrice(ticker) {
   return price;
 }
 
-// GET /api/prices — Return latest prices as JSON (for live polling)
-app.get('/api/prices', async (_req, res) => {
+// GET /api/prices
+app.get('/api/prices', requireAuth, async (req, res) => {
   res.set('Cache-Control', 'no-store');
-  const assets = await getAllAssets();
+  const assets = await getAllAssets(req.session.userId);
   const now = new Date().toISOString();
   const results = {};
 
@@ -259,13 +334,10 @@ app.get('/api/prices', async (_req, res) => {
   res.json(results);
 });
 
-// POST /refresh — Fetch latest prices from Yahoo Finance
-app.post('/refresh', async (_req, res) => {
-  const assets = await getAllAssets();
-
-  if (assets.length === 0) {
-    return res.redirect('/?error=No+assets+to+refresh');
-  }
+// POST /refresh
+app.post('/refresh', requireAuth, async (req, res) => {
+  const assets = await getAllAssets(req.session.userId);
+  if (assets.length === 0) return res.redirect('/?error=No+assets+to+refresh');
 
   const now = new Date().toISOString();
   const failed = [];
@@ -280,11 +352,8 @@ app.post('/refresh', async (_req, res) => {
     }
   }
 
-  if (failed.length > 0) {
-    return res.redirect(
-      `/?error=Could+not+fetch+prices+for:+${encodeURIComponent(failed.join(', '))}`
-    );
-  }
+  if (failed.length > 0)
+    return res.redirect(`/?error=Could+not+fetch+prices+for:+${encodeURIComponent(failed.join(', '))}`);
 
   res.redirect('/?success=Prices+refreshed+successfully');
 });

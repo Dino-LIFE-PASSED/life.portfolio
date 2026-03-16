@@ -2,11 +2,17 @@ const { Pool } = require('pg');
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-// Initialize schema
 async function initDb() {
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      username TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
     CREATE TABLE IF NOT EXISTS assets (
       id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       name TEXT NOT NULL,
       ticker TEXT NOT NULL,
       asset_type TEXT NOT NULL DEFAULT 'stock',
@@ -19,44 +25,73 @@ async function initDb() {
     );
     CREATE TABLE IF NOT EXISTS wallets (
       id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       label TEXT NOT NULL,
-      address TEXT NOT NULL UNIQUE,
+      address TEXT NOT NULL,
       btc_balance REAL,
       btc_unconfirmed REAL,
       usd_value REAL,
       last_updated TEXT,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_id, address)
     );
   `);
 }
 
-async function getAllAssets() {
-  const { rows } = await pool.query('SELECT * FROM assets ORDER BY created_at DESC');
-  return rows;
+// ─── Users ───────────────────────────────────────────────────────────────────
+
+async function createUser(username, passwordHash) {
+  const { rows } = await pool.query(
+    'INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username',
+    [username, passwordHash]
+  );
+  return rows[0];
 }
 
-async function getAssetById(id) {
-  const { rows } = await pool.query('SELECT * FROM assets WHERE id = $1', [id]);
+async function getUserByUsername(username) {
+  const { rows } = await pool.query(
+    'SELECT * FROM users WHERE username = $1',
+    [username]
+  );
   return rows[0] || null;
 }
 
-async function addAsset(data) {
+// ─── Assets ──────────────────────────────────────────────────────────────────
+
+async function getAllAssets(userId) {
+  const { rows } = await pool.query(
+    'SELECT * FROM assets WHERE user_id = $1 ORDER BY created_at DESC',
+    [userId]
+  );
+  return rows;
+}
+
+async function getAssetById(id, userId) {
+  const { rows } = await pool.query(
+    'SELECT * FROM assets WHERE id = $1 AND user_id = $2',
+    [id, userId]
+  );
+  return rows[0] || null;
+}
+
+async function addAsset(userId, data) {
   await pool.query(
-    `INSERT INTO assets (name, ticker, asset_type, quantity, buy_price, buy_date)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
-    [data.name, data.ticker, data.asset_type, data.quantity, data.buy_price, data.buy_date]
+    `INSERT INTO assets (user_id, name, ticker, asset_type, quantity, buy_price, buy_date)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [userId, data.name, data.ticker, data.asset_type, data.quantity, data.buy_price, data.buy_date]
   );
 }
 
-async function updateAsset(id, data) {
+async function updateAsset(id, userId, data) {
   await pool.query(
-    `UPDATE assets SET name=$1, ticker=$2, asset_type=$3, quantity=$4, buy_price=$5 WHERE id=$6`,
-    [data.name, data.ticker, data.asset_type, data.quantity, data.buy_price, id]
+    `UPDATE assets SET name=$1, ticker=$2, asset_type=$3, quantity=$4, buy_price=$5
+     WHERE id=$6 AND user_id=$7`,
+    [data.name, data.ticker, data.asset_type, data.quantity, data.buy_price, id, userId]
   );
 }
 
-async function deleteAsset(id) {
-  await pool.query('DELETE FROM assets WHERE id = $1', [id]);
+async function deleteAsset(id, userId) {
+  await pool.query('DELETE FROM assets WHERE id = $1 AND user_id = $2', [id, userId]);
 }
 
 async function updatePrice(id, price, lastUpdated) {
@@ -66,20 +101,25 @@ async function updatePrice(id, price, lastUpdated) {
   );
 }
 
-async function getAllWallets() {
-  const { rows } = await pool.query('SELECT * FROM wallets ORDER BY created_at ASC');
+// ─── Wallets ─────────────────────────────────────────────────────────────────
+
+async function getAllWallets(userId) {
+  const { rows } = await pool.query(
+    'SELECT * FROM wallets WHERE user_id = $1 ORDER BY created_at ASC',
+    [userId]
+  );
   return rows;
 }
 
-async function addWallet(label, address) {
+async function addWallet(userId, label, address) {
   await pool.query(
-    'INSERT INTO wallets (label, address) VALUES ($1, $2)',
-    [label, address]
+    'INSERT INTO wallets (user_id, label, address) VALUES ($1, $2, $3)',
+    [userId, label, address]
   );
 }
 
-async function deleteWallet(id) {
-  await pool.query('DELETE FROM wallets WHERE id = $1', [id]);
+async function deleteWallet(id, userId) {
+  await pool.query('DELETE FROM wallets WHERE id = $1 AND user_id = $2', [id, userId]);
 }
 
 async function updateWalletBalance(id, btc_balance, btc_unconfirmed, usd_value, last_updated) {
@@ -90,7 +130,9 @@ async function updateWalletBalance(id, btc_balance, btc_unconfirmed, usd_value, 
 }
 
 module.exports = {
+  pool,
   initDb,
+  createUser, getUserByUsername,
   getAllAssets, getAssetById, addAsset, updateAsset, deleteAsset, updatePrice,
   getAllWallets, addWallet, deleteWallet, updateWalletBalance,
 };
