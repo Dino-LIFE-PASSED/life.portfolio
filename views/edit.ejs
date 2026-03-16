@@ -1,0 +1,142 @@
+<%- include('partials/header', { pageTitle: 'Edit Asset — life.portfolio', activePage: 'dashboard' }) %>
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Edit Asset</h1>
+    <p class="page-subtitle">Update details for <%= asset.name %></p>
+  </div>
+  <a href="/" class="btn btn-ghost">&larr; Back to Dashboard</a>
+</div>
+
+<% if (error) { %>
+  <div class="alert alert-error"><span>&#9888;</span> <%= error %></div>
+<% } %>
+
+<div class="form-container">
+  <div class="card form-card">
+    <form action="/edit/<%= asset.id %>" method="POST" class="asset-form">
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="name" class="form-label">Asset Name <span class="required">*</span></label>
+          <input
+            type="text"
+            id="name"
+            name="name"
+            class="form-input"
+            placeholder="e.g. Apple Inc."
+            value="<%= asset.name %>"
+            required
+          />
+          <p class="form-hint">Full name of the asset or company</p>
+        </div>
+
+        <div class="form-group">
+          <label for="ticker" class="form-label">Ticker Symbol <span class="required">*</span></label>
+          <input
+            type="text"
+            id="ticker"
+            name="ticker"
+            class="form-input ticker-input"
+            placeholder="e.g. AAPL"
+            value="<%= asset.ticker %>"
+            required
+          />
+          <p class="form-hint">Yahoo Finance ticker (e.g. AAPL, BTC-USD, SPY)</p>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="asset_type" class="form-label">Asset Type <span class="required">*</span></label>
+          <select id="asset_type" name="asset_type" class="form-input form-select" required>
+            <option value="stock" <%= asset.asset_type === 'stock' ? 'selected' : '' %>>Stock</option>
+            <option value="etf" <%= asset.asset_type === 'etf' ? 'selected' : '' %>>ETF</option>
+            <option value="crypto" <%= asset.asset_type === 'crypto' ? 'selected' : '' %>>Crypto</option>
+          </select>
+          <p class="form-hint">Category of this investment</p>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="quantity" class="form-label">Quantity <span class="required">*</span></label>
+          <input
+            type="number"
+            id="quantity"
+            name="quantity"
+            class="form-input"
+            placeholder="e.g. 10"
+            value="<%= asset.quantity %>"
+            step="any"
+            min="0.000001"
+            required
+          />
+          <p class="form-hint">Number of shares or units</p>
+        </div>
+
+        <div class="form-group">
+          <label for="buy_price" class="form-label">Buy Price (USD) <span class="required">*</span></label>
+          <div class="input-prefix-wrap">
+            <span class="input-prefix">$</span>
+            <input
+              type="number"
+              id="buy_price"
+              name="buy_price"
+              class="form-input has-prefix"
+              placeholder="e.g. 150.00"
+              value="<%= asset.buy_price %>"
+              step="any"
+              min="0.000001"
+              required
+            />
+          </div>
+          <p class="form-hint">Price per unit at time of purchase</p>
+        </div>
+      </div>
+
+      <div class="form-summary" id="formSummary" style="display:none">
+        <p class="form-summary-label">Total Cost Basis</p>
+        <p class="form-summary-value" id="costBasis">—</p>
+      </div>
+
+      <div class="form-actions">
+        <a href="/" class="btn btn-ghost">Cancel</a>
+        <button type="submit" class="btn btn-primary btn-lg">Save Changes</button>
+      </div>
+
+    </form>
+  </div>
+</div>
+
+<script>
+  const qtyInput = document.getElementById('quantity');
+  const priceInput = document.getElementById('buy_price');
+  const summaryEl = document.getElementById('formSummary');
+  const costBasisEl = document.getElementById('costBasis');
+
+  function updateSummary() {
+    const qty = parseFloat(qtyInput.value);
+    const price = parseFloat(priceInput.value);
+    if (qty > 0 && price > 0) {
+      costBasisEl.textContent = '$' + (qty * price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      summaryEl.style.display = 'flex';
+    } else {
+      summaryEl.style.display = 'none';
+    }
+  }
+
+  qtyInput.addEventListener('input', updateSummary);
+  priceInput.addEventListener('input', updateSummary);
+
+  const tickerInput = document.getElementById('ticker');
+  tickerInput.addEventListener('input', function () {
+    const pos = this.selectionStart;
+    this.value = this.value.toUpperCase();
+    this.setSelectionRange(pos, pos);
+  });
+
+  updateSummary();
+</script>
+
+<%- include('partials/footer') %>

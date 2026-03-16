@@ -1,0 +1,19 @@
+{
+  "name": "life-portfolio",
+  "version": "1.0.0",
+  "description": "Personal asset portfolio tracker with live prices",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.8.0",
+    "ejs": "^3.1.9",
+    "express": "^4.18.2",
+    "yahoo-finance2": "^2.11.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}
