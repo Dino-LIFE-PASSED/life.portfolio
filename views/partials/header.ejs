@@ -33,37 +33,35 @@
   (function() {
     var c = document.getElementById('matrix-bg');
     var ctx = c.getContext('2d');
-    var FS = 13;
-    var CHARS = '0123456789ABCDEFabcdef₿$#{}[]<>=+|&!;';
+    var FS = 16;
+    var CHARS = '0123456789ABCDEF₿$#&|';
     var BTC = '#F7931A';
+    var BTC_DIM = '#a04e0f';
     var cols, drops, speeds;
     function resize() {
       c.width = window.innerWidth;
       c.height = window.innerHeight;
-      cols = Math.floor(c.width / FS);
+      /* every 3rd column so the screen isn't packed */
+      cols = Math.floor(c.width / (FS * 3));
       drops = []; speeds = [];
       for (var i = 0; i < cols; i++) {
         drops[i] = Math.random() * -(c.height / FS);
-        speeds[i] = 0.18 + Math.random() * 0.45;
+        speeds[i] = 0.08 + Math.random() * 0.18;   /* much slower */
       }
     }
     function draw() {
-      ctx.fillStyle = 'rgba(15,15,20,0.055)';
+      ctx.fillStyle = 'rgba(15,15,20,0.04)';
       ctx.fillRect(0, 0, c.width, c.height);
       ctx.font = FS + 'px "JetBrains Mono",monospace';
       for (var i = 0; i < cols; i++) {
         var ch = CHARS[Math.floor(Math.random() * CHARS.length)];
         var r = Math.random();
-        if (ch === '₿') {
-          ctx.fillStyle = BTC;
-        } else if (r < 0.08) {
-          ctx.fillStyle = '#F7931A';           /* BTC orange accent */
-        } else if (r < 0.3) {
-          ctx.fillStyle = 'rgba(255,255,255,0.85)';
+        if (ch === '₿' || r < 0.55) {
+          ctx.fillStyle = r < 0.25 ? BTC : BTC_DIM;   /* mostly BTC orange */
         } else {
-          ctx.fillStyle = 'rgba(255,255,255,0.2)';
+          ctx.fillStyle = r < 0.75 ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.25)';
         }
-        ctx.fillText(ch, i * FS, drops[i] * FS);
+        ctx.fillText(ch, i * FS * 3, drops[i] * FS);
         if (drops[i] * FS > c.height && Math.random() > 0.975) drops[i] = 0;
         drops[i] += speeds[i];
       }

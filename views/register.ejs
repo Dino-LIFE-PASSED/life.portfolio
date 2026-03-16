@@ -15,20 +15,20 @@
   (function() {
     var c = document.getElementById('matrix-bg');
     var ctx = c.getContext('2d');
-    var FS = 13, CHARS = '0123456789ABCDEFabcdef₿$#{}[]<>=+|&!;', BTC = '#F7931A';
+    var FS = 16, CHARS = '0123456789ABCDEF₿$#&|', BTC = '#F7931A', BTC_DIM = '#a04e0f';
     var cols, drops, speeds;
     function resize() {
       c.width = window.innerWidth; c.height = window.innerHeight;
-      cols = Math.floor(c.width / FS); drops = []; speeds = [];
-      for (var i = 0; i < cols; i++) { drops[i] = Math.random() * -(c.height / FS); speeds[i] = 0.18 + Math.random() * 0.45; }
+      cols = Math.floor(c.width / (FS * 3)); drops = []; speeds = [];
+      for (var i = 0; i < cols; i++) { drops[i] = Math.random() * -(c.height / FS); speeds[i] = 0.08 + Math.random() * 0.18; }
     }
     function draw() {
-      ctx.fillStyle = 'rgba(15,15,20,0.055)'; ctx.fillRect(0, 0, c.width, c.height);
+      ctx.fillStyle = 'rgba(15,15,20,0.04)'; ctx.fillRect(0, 0, c.width, c.height);
       ctx.font = FS + 'px "JetBrains Mono",monospace';
       for (var i = 0; i < cols; i++) {
         var ch = CHARS[Math.floor(Math.random() * CHARS.length)], r = Math.random();
-        ctx.fillStyle = ch === '₿' ? BTC : r < 0.08 ? '#F7931A' : r < 0.3 ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.2)';
-        ctx.fillText(ch, i * FS, drops[i] * FS);
+        ctx.fillStyle = ch === '₿' || r < 0.55 ? (r < 0.25 ? BTC : BTC_DIM) : (r < 0.75 ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.25)');
+        ctx.fillText(ch, i * FS * 3, drops[i] * FS);
         if (drops[i] * FS > c.height && Math.random() > 0.975) drops[i] = 0;
         drops[i] += speeds[i];
       }
