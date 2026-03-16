@@ -976,3 +976,12 @@ input[type="number"]::-webkit-outer-spin-button {
 @media (max-width: 400px) {
   .summary-grid { grid-template-columns: 1fr; }
 }
+
+/* ─── Upload row (URL input + upload button side by side) ───────────────── */
+.upload-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.upload-row .form-input { flex: 1; }
+.upload-label { cursor: pointer; flex-shrink: 0; }
