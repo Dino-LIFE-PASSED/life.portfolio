@@ -235,9 +235,10 @@ app.post('/register', async (req, res) => {
 app.post('/profile', requireAuth, async (req, res) => {
   const { profile_image_url, bg_gif_url } = req.body;
   const updated = await updateUserProfile(req.session.userId, profile_image_url, bg_gif_url);
-  // Store a flag in session so header knows whether images exist
   req.session.hasProfileImage = !!updated.profile_image_url;
   req.session.hasBgGif = !!updated.bg_gif_url;
+  // JSON clients (fetch) get a JSON response; form clients get a redirect
+  if (req.is('application/json')) return res.json({ ok: true });
   res.redirect('/?success=Profile+updated');
 });
 

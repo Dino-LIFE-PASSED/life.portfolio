@@ -65,7 +65,7 @@
         <h2 class="modal-title">Profile Settings</h2>
         <button class="modal-close" onclick="document.getElementById('profileModal').classList.add('hidden')">&#10005;</button>
       </div>
-      <form method="POST" action="/profile" class="modal-form">
+      <form id="profileForm" class="modal-form">
         <div class="form-group">
           <label class="form-label">Profile Image</label>
           <div class="upload-row">
@@ -148,6 +148,27 @@
 
     bindFileUpload('profileImageFile', 'profileImageInput', 'profileImageHint');
     bindFileUpload('bgGifFile', 'bgGifInput', 'bgGifHint');
+
+    // Submit as JSON so base64 '+' characters are never corrupted by URL-encoding
+    document.getElementById('profileForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const profileUrl = document.getElementById('profileImageInput').value;
+      const bgUrl = document.getElementById('bgGifInput').value;
+      const saveBtn = this.querySelector('button[type="submit"]');
+      if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
+      try {
+        const r = await fetch('/profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ profile_image_url: profileUrl, bg_gif_url: bgUrl }),
+        });
+        const d = await r.json();
+        if (d.ok) window.location.href = '/?success=Profile+updated';
+        else { if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save'; } }
+      } catch (_) {
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save'; }
+      }
+    });
 
     const profileInput = document.getElementById('profileImageInput');
     const bgInput = document.getElementById('bgGifInput');
