@@ -198,6 +198,8 @@
 <script type="application/json" id="walletData"><%- JSON.stringify(wallets.map(w => ({ id: w.id, usd: w.usd_value }))) %></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 <script>
+// Shared currency state — read by chart tooltip at hover time
+window._currency = { showThb: false, usdToThb: null };
 (function () {
   const chartData = JSON.parse(document.getElementById('chartData').textContent);
   const labels = chartData.labels;
@@ -221,7 +223,15 @@
       responsive: true, maintainAspectRatio: true, cutout: '62%',
       plugins: {
         legend: { display: false },
-        tooltip: { callbacks: { label: ctx => ` $${ctx.parsed.toLocaleString('en-US',{minimumFractionDigits:2})} (${total>0?((ctx.parsed/total)*100).toFixed(1):0}%)` } }
+        tooltip: { callbacks: { label: function(ctx) {
+          const usd = ctx.parsed;
+          const pct = total > 0 ? ((usd / total) * 100).toFixed(1) : 0;
+          if (window._currency.showThb && window._currency.usdToThb) {
+            const thb = usd * window._currency.usdToThb;
+            return ` ฿${thb.toLocaleString('en-US', {maximumFractionDigits: 0})} (${pct}%)`;
+          }
+          return ` $${usd.toLocaleString('en-US', {minimumFractionDigits: 2})} (${pct}%)`;
+        }}}
       }
     }
   });
@@ -249,6 +259,7 @@
       if (!r.ok) return;
       const d = await r.json();
       usdToThb = d.usdToThb;
+      window._currency.usdToThb = usdToThb;
     } catch (_) {}
   }
 
@@ -256,8 +267,33 @@
     if (!usdToThb) await fetchRate();
     if (!usdToThb) return;
     showThb = !showThb;
+    window._currency.showThb = showThb;
+    localStorage.setItem('preferredCurrency', showThb ? 'thb' : 'usd');
     thbBtn.textContent = showThb ? 'Show in USD' : 'Show in THB';
     renderAllValues();
+  });
+
+  // Restore saved currency preference
+  if (localStorage.getItem('preferredCurrency') === 'thb') {
+    fetchRate().then(() => {
+      if (!usdToThb) return;
+      showThb = true;
+      window._currency.showThb = true;
+      thbBtn.textContent = 'Show in USD';
+      renderAllValues();
+    });
+  }
+
+  // Auto-fade alerts after 30 seconds
+  document.querySelectorAll('.alert').forEach(function(el) {
+    setTimeout(function() {
+      el.style.transition = 'opacity 0.8s ease, margin 0.8s ease, padding 0.8s ease, max-height 0.8s ease';
+      el.style.opacity = '0';
+      el.style.maxHeight = '0';
+      el.style.padding = '0';
+      el.style.marginBottom = '0';
+      el.style.overflow = 'hidden';
+    }, 30000);
   });
 
   // ─── Formatters ───────────────────────────────────────────────────────────

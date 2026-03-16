@@ -41,7 +41,6 @@
     </div>
     <div class="nav-links">
       <a href="/" class="nav-link <%= typeof activePage !== 'undefined' && activePage === 'dashboard' ? 'active' : '' %>">Dashboard</a>
-      <a href="/add" class="nav-link btn-nav <%= typeof activePage !== 'undefined' && activePage === 'add' ? 'active' : '' %>">+ Add</a>
       <% if (typeof username !== 'undefined' && username) { %>
         <button class="btn-profile" onclick="document.getElementById('profileModal').classList.remove('hidden')" title="Profile settings">
           <% if (typeof hasProfileImage !== 'undefined' && hasProfileImage) { %>
@@ -54,8 +53,32 @@
           <button type="submit" class="btn-logout">Logout</button>
         </form>
       <% } %>
+      <button class="nav-hamburger" id="navHamburger" aria-label="Menu">&#9776;</button>
     </div>
   </nav>
+  <!-- Mobile dropdown -->
+  <div class="nav-dropdown hidden" id="navDropdown">
+    <a href="/" class="nav-dropdown-item">Dashboard</a>
+    <% if (typeof username !== 'undefined' && username) { %>
+      <button class="nav-dropdown-item" onclick="document.getElementById('navDropdown').classList.add('hidden');document.getElementById('profileModal').classList.remove('hidden')">Profile Settings</button>
+      <form method="POST" action="/logout">
+        <button type="submit" class="nav-dropdown-item nav-dropdown-logout">Logout</button>
+      </form>
+    <% } %>
+  </div>
+  <script>
+    (function() {
+      var btn = document.getElementById('navHamburger');
+      var drop = document.getElementById('navDropdown');
+      if (!btn || !drop) return;
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        drop.classList.toggle('hidden');
+      });
+      document.addEventListener('click', function() { drop.classList.add('hidden'); });
+      drop.addEventListener('click', function(e) { e.stopPropagation(); });
+    })();
+  </script>
 
   <% if (typeof username !== 'undefined' && username) { %>
   <!-- Profile Settings Modal -->

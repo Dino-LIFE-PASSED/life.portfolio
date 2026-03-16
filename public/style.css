@@ -125,6 +125,57 @@ body {
   border-color: var(--accent);
 }
 
+/* ─── Mobile hamburger & dropdown ───────────────────────────────────────── */
+.nav-hamburger {
+  display: none;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 18px;
+  line-height: 1;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition);
+}
+.nav-hamburger:hover { background: var(--bg-card-2); }
+
+.nav-dropdown {
+  position: fixed;
+  top: 64px;
+  right: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  z-index: 200;
+  min-width: 180px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.nav-dropdown.hidden { display: none; }
+
+.nav-dropdown-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 500;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-decoration: none;
+  transition: background var(--transition), color var(--transition);
+}
+.nav-dropdown-item:hover { background: var(--bg-card-2); color: var(--text); }
+.nav-dropdown-logout { color: var(--negative); }
+.nav-dropdown-logout:hover { background: var(--negative-bg); color: var(--negative); }
+
 /* ─── Page header ───────────────────────────────────────────────────────── */
 .page-header {
   display: flex;
@@ -925,8 +976,9 @@ input[type="number"]::-webkit-outer-spin-button {
   .navbar { padding: 0 12px; height: 56px; }
   .nav-title { font-size: 15px; }
   .nav-logo { font-size: 18px; }
-  .nav-link:not(.btn-nav):not(.active) { display: none; }
-  .nav-user { display: none; }
+  .nav-links .nav-link, .nav-links .btn-profile, .nav-links .btn-logout { display: none; }
+  .nav-hamburger { display: block; }
+  .nav-dropdown { top: 56px; }
   .btn-logout { padding: 5px 10px; font-size: 12px; }
 
   /* Container */
