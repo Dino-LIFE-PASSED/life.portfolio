@@ -109,8 +109,8 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
 // Middleware
-app.use(express.urlencoded({ extended: true, limit: '20mb' }));
-app.use(express.json({ limit: '20mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Session
@@ -252,7 +252,7 @@ app.get('/api/profile/avatar', requireAuth, async (req, res) => {
     const mime = mimeMatch ? mimeMatch[1] : 'image/gif';
     const buf = Buffer.from(b64, 'base64');
     res.set('Content-Type', mime);
-    res.set('Cache-Control', 'private, max-age=3600');
+    res.set('Cache-Control', 'no-store');
     return res.send(buf);
   }
   res.redirect(url);
@@ -269,10 +269,25 @@ app.get('/api/profile/bg', requireAuth, async (req, res) => {
     const mime = mimeMatch ? mimeMatch[1] : 'image/gif';
     const buf = Buffer.from(b64, 'base64');
     res.set('Content-Type', mime);
-    res.set('Cache-Control', 'private, max-age=3600');
+    res.set('Cache-Control', 'no-store');
     return res.send(buf);
   }
   res.redirect(url);
+});
+
+// GET /api/debug/image-sizes — check stored image byte sizes
+app.get('/api/debug/image-sizes', requireAuth, async (req, res) => {
+  const { rows } = await pool.query('SELECT profile_image_url, bg_gif_url FROM users WHERE id=$1', [req.session.userId]);
+  const row = rows[0] || {};
+  const info = {
+    profile: row.profile_image_url
+      ? { bytes: Buffer.byteLength(row.profile_image_url, 'utf8'), isDataUrl: row.profile_image_url.startsWith('data:') }
+      : null,
+    bg: row.bg_gif_url
+      ? { bytes: Buffer.byteLength(row.bg_gif_url, 'utf8'), isDataUrl: row.bg_gif_url.startsWith('data:') }
+      : null,
+  };
+  res.json(info);
 });
 
 // POST /logout
