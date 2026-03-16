@@ -50,22 +50,21 @@ function isXpub(str) {
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 async function scanXpub(xpubStr) {
-  const type = xpubStr.slice(0, 4); // xpub, ypub, zpub
+  const type = xpubStr.slice(0, 4);
   const label = xpubStr.slice(0, 10) + '…';
-  console.log(`[scanXpub] ${label} type=${type} starting (batch mode)`);
+  console.log(`[scanXpub] ${label} type=${type} starting`);
 
   const normalized = (type === 'xpub') ? xpubStr : normalizeXpub(xpubStr);
   const master = HDKey.fromExtendedKey(normalized);
   const external = master.derive('m/0');
 
   const GAP_LIMIT = 20;
-  const BATCH = 50; // Blockchair supports up to 100 addresses per request
+  const BATCH = 50;
   let gap = 0;
   let index = 0;
   let totalSats = 0;
 
   while (gap < GAP_LIMIT) {
-    // Derive a batch of addresses
     const batch = [];
     for (let i = 0; i < BATCH; i++) {
       const child = external.deriveChild(index + i);
@@ -74,37 +73,34 @@ async function scanXpub(xpubStr) {
 
     try {
       const r = await fetch(
-        `https://api.blockchair.com/bitcoin/addresses/balances?addresses=${batch.join(',')}`,
-        { signal: AbortSignal.timeout(15000) }
+        `https://blockchain.info/multiaddr?active=${batch.join('|')}&n=0`,
+        { signal: AbortSignal.timeout(20000) }
       );
-      if (r.status === 429) {
-        console.log(`[scanXpub] ${label} rate-limited, waiting 5s`);
-        await sleep(5000);
-        continue;
-      }
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const data = await r.json();
-      const balances = data.data || {};
+
+      // Build address → stats map
+      const addrMap = {};
+      for (const a of (data.addresses || [])) addrMap[a.address] = a;
 
       for (let i = 0; i < batch.length; i++) {
-        const addr = batch[i];
-        if (addr in balances) {
-          // Address has been used — balances[addr] is current unspent sats (0 if all spent)
-          totalSats += balances[addr];
-          gap = 0;
-        } else {
+        const info = addrMap[batch[i]];
+        if (!info || info.n_tx === 0) {
           gap++;
           if (gap >= GAP_LIMIT) break;
+        } else {
+          totalSats += info.final_balance;
+          gap = 0;
         }
       }
-      console.log(`[scanXpub] ${label} checked index ${index}–${index + BATCH - 1}, gap=${gap}, sats=${totalSats}`);
+      console.log(`[scanXpub] ${label} index ${index}–${index + BATCH - 1}, gap=${gap}, sats=${totalSats}`);
     } catch (err) {
-      console.error(`[scanXpub] ${label} batch error: ${err.message}`);
+      console.error(`[scanXpub] ${label} error: ${err.message}`);
       break;
     }
 
     index += BATCH;
-    await sleep(500); // 500ms between batch requests
+    await sleep(300);
   }
 
   const btc = totalSats / 1e8;
@@ -475,11 +471,15 @@ app.get('/api/wallets', requireAuth, async (req, res) => {
         unconfirmed = 0;
       } else {
         // Single address
-        const r = await fetch(`https://blockstream.info/api/address/${w.address}`);
+        const r = await fetch(
+          `https://blockchain.info/multiaddr?active=${w.address}&n=0`,
+          { signal: AbortSignal.timeout(10000) }
+        );
         if (!r.ok) throw new Error('HTTP ' + r.status);
         const d = await r.json();
-        btc = (d.chain_stats.funded_txo_sum - d.chain_stats.spent_txo_sum) / 1e8;
-        unconfirmed = (d.mempool_stats.funded_txo_sum - d.mempool_stats.spent_txo_sum) / 1e8;
+        const info = d.addresses?.[0];
+        btc = info ? info.final_balance / 1e8 : 0;
+        unconfirmed = 0;
       }
 
       const usd = btcUsd != null ? btc * btcUsd : null;
