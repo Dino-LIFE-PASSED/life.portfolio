@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 190" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
+
+  <!-- ── HAT ── -->
+  <!-- Brim: wide fedora oval -->
+  <ellipse cx="113" cy="55" rx="50" ry="11"/>
+  <!-- Crown: dome shape -->
+  <path d="M75,55 C76,28 88,16 113,16 C138,16 150,28 151,55"/>
+  <!-- Crown crease at top -->
+  <path d="M96,18 C106,11 120,11 130,18"/>
+
+  <!-- ── HEAD ── -->
+  <ellipse cx="113" cy="74" rx="22" ry="20"/>
+
+  <!-- ── NECK ── -->
+  <line x1="103" y1="92" x2="101" y2="106"/>
+  <line x1="123" y1="92" x2="125" y2="106"/>
+
+  <!-- ── SUIT BODY ── -->
+  <path d="M101,106 C85,112 70,120 60,172"/>
+  <path d="M125,106 C141,112 156,120 166,172"/>
+  <line x1="60" y1="172" x2="166" y2="172"/>
+
+  <!-- ── LAPELS ── -->
+  <path d="M101,106 L93,126 L113,134"/>
+  <path d="M125,106 L133,126 L113,134"/>
+
+  <!-- ── TIE ── -->
+  <path d="M109,111 L107,122 L113,139 L119,122 L117,111 Z"/>
+
+  <!-- ── LEFT ARM (reaching to coin) ── -->
+  <path d="M78,128 C66,132 55,134 48,137"/>
+
+  <!-- ── DOLLAR COIN ── -->
+  <circle cx="39" cy="117" r="27"/>
+  <!-- $ vertical bar -->
+  <line x1="39" y1="99" x2="39" y2="135"/>
+  <!-- $ S-curves -->
+  <path d="M31,107 C31,107 47,104 47,111 C47,118 31,118 31,125 C31,132 47,129 47,129"/>
+
+  <!-- ── MAGNET / HAND below coin ── -->
+  <path d="M14,143 C24,138 36,140 43,144"/>
+  <path d="M10,152 C22,146 38,148 48,153"/>
+  <path d="M14,161 C27,154 41,157 53,160"/>
+
+  <!-- ── BAR CHART ── -->
+  <!-- Baseline -->
+  <line x1="150" y1="172" x2="222" y2="172"/>
+  <!-- Bar 1 (short) -->
+  <rect x="154" y="151" width="14" height="21"/>
+  <!-- Bar 2 (medium) -->
+  <rect x="172" y="135" width="14" height="37"/>
+  <!-- Bar 3 (tall) -->
+  <rect x="190" y="116" width="14" height="56"/>
+
+  <!-- ── GROWTH ARROW ── -->
+  <path d="M149,157 Q173,112 212,72"/>
+  <!-- Arrowhead -->
+  <polyline points="201,66 214,72 207,83"/>
+
+</svg>

@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="icon" type="image/svg+xml" href="/logo.svg" />
   <% if (typeof hasBgGif !== 'undefined' && hasBgGif) { %>
   <style>
     body { background: #0f0f14; }
@@ -117,7 +118,7 @@
       <% if (typeof hasProfileImage !== 'undefined' && hasProfileImage) { %>
         <img src="/api/profile/avatar?t=<%= Date.now() %>" alt="Profile" class="nav-avatar" />
       <% } else { %>
-        <span class="nav-logo">&#9682;</span>
+        <img src="/logo.svg" alt="logo" class="nav-logo-img" />
       <% } %>
       <span class="nav-title">life.portfolio</span>
     </div>
