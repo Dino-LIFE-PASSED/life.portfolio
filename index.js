@@ -1,6 +1,6 @@
 const express = require('express');
 const path = require('path');
-const { getAllAssets, getAssetById, addAsset, updateAsset, deleteAsset, updatePrice,
+const { initDb, getAllAssets, getAssetById, addAsset, updateAsset, deleteAsset, updatePrice,
         getAllWallets, addWallet, deleteWallet, updateWalletBalance } = require('./db');
 
 const app = express();
@@ -59,10 +59,10 @@ function computeStats(assets) {
 // ─── Routes ─────────────────────────────────────────────────────────────────
 
 // GET / — Dashboard
-app.get('/', (req, res) => {
-  const assets = getAllAssets();
+app.get('/', async (req, res) => {
+  const assets = await getAllAssets();
   const { enriched, summary, chart } = computeStats(assets);
-  const wallets = getAllWallets();
+  const wallets = await getAllWallets();
   res.render('index', {
     assets: enriched,
     summary,
@@ -74,12 +74,12 @@ app.get('/', (req, res) => {
 });
 
 // GET /add — Add asset form
-app.get('/add', (req, res) => {
+app.get('/add', (_req, res) => {
   res.render('add', { error: null, formData: {} });
 });
 
 // POST /add — Insert new asset
-app.post('/add', (req, res) => {
+app.post('/add', async (req, res) => {
   const { name, ticker, asset_type, quantity, buy_price } = req.body;
 
   const errors = [];
@@ -97,7 +97,7 @@ app.post('/add', (req, res) => {
   }
 
   try {
-    addAsset({
+    await addAsset({
       name: name.trim(),
       ticker: ticker.trim().toUpperCase(),
       asset_type,
@@ -116,14 +116,14 @@ app.post('/add', (req, res) => {
 });
 
 // GET /edit/:id — Edit asset form
-app.get('/edit/:id', (req, res) => {
-  const asset = getAssetById(parseInt(req.params.id, 10));
+app.get('/edit/:id', async (req, res) => {
+  const asset = await getAssetById(parseInt(req.params.id, 10));
   if (!asset) return res.redirect('/?error=Asset+not+found');
   res.render('edit', { error: null, asset });
 });
 
 // POST /edit/:id — Save edited asset
-app.post('/edit/:id', (req, res) => {
+app.post('/edit/:id', async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const { name, ticker, asset_type, quantity, buy_price } = req.body;
 
@@ -138,12 +138,12 @@ app.post('/edit/:id', (req, res) => {
     errors.push('Buy price must be a positive number.');
 
   if (errors.length > 0) {
-    const asset = getAssetById(id);
+    const asset = await getAssetById(id);
     return res.render('edit', { error: errors.join(' '), asset: { ...asset, ...req.body, id } });
   }
 
   try {
-    updateAsset(id, {
+    await updateAsset(id, {
       name: name.trim(),
       ticker: ticker.trim().toUpperCase(),
       asset_type,
@@ -158,10 +158,10 @@ app.post('/edit/:id', (req, res) => {
 });
 
 // POST /delete/:id — Remove an asset
-app.post('/delete/:id', (req, res) => {
+app.post('/delete/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    deleteAsset(parseInt(id, 10));
+    await deleteAsset(parseInt(id, 10));
     res.redirect('/?success=Asset+deleted');
   } catch (err) {
     console.error('Error deleting asset:', err);
@@ -170,28 +170,30 @@ app.post('/delete/:id', (req, res) => {
 });
 
 // POST /wallet/add
-app.post('/wallet/add', (req, res) => {
+app.post('/wallet/add', async (req, res) => {
   const { label, address } = req.body;
   if (!label || !address) return res.redirect('/?error=Label+and+address+required');
   try {
-    addWallet(label.trim(), address.trim());
+    await addWallet(label.trim(), address.trim());
     res.redirect('/?success=Wallet+added');
   } catch (err) {
-    const msg = err.message.includes('UNIQUE') ? 'Address+already+tracked' : 'Failed+to+add+wallet';
+    const msg = err.message.includes('unique') || err.message.includes('UNIQUE')
+      ? 'Address+already+tracked'
+      : 'Failed+to+add+wallet';
     res.redirect('/?error=' + msg);
   }
 });
 
 // POST /wallet/delete/:id
-app.post('/wallet/delete/:id', (req, res) => {
-  deleteWallet(parseInt(req.params.id, 10));
+app.post('/wallet/delete/:id', async (req, res) => {
+  await deleteWallet(parseInt(req.params.id, 10));
   res.redirect('/?success=Wallet+removed');
 });
 
 // GET /api/wallets — fetch balances from mempool.space
 app.get('/api/wallets', async (_req, res) => {
   res.set('Cache-Control', 'no-store');
-  const wallets = getAllWallets();
+  const wallets = await getAllWallets();
   if (wallets.length === 0) return res.json([]);
 
   // Get BTC price from mempool
@@ -210,7 +212,7 @@ app.get('/api/wallets', async (_req, res) => {
       const btc = (d.chain_stats.funded_txo_sum - d.chain_stats.spent_txo_sum) / 1e8;
       const unconfirmed = (d.mempool_stats.funded_txo_sum - d.mempool_stats.spent_txo_sum) / 1e8;
       const usd = btcUsd != null ? btc * btcUsd : null;
-      updateWalletBalance(w.id, btc, unconfirmed, usd, now);
+      await updateWalletBalance(w.id, btc, unconfirmed, usd, now);
       return { id: w.id, label: w.label, address: w.address, btc, unconfirmed, usd, updated: now };
     } catch (err) {
       console.error(`Wallet fetch failed for ${w.address}:`, err.message);
@@ -237,20 +239,19 @@ async function fetchPrice(ticker) {
 // GET /api/prices — Return latest prices as JSON (for live polling)
 app.get('/api/prices', async (_req, res) => {
   res.set('Cache-Control', 'no-store');
-  const assets = getAllAssets();
+  const assets = await getAllAssets();
   const now = new Date().toISOString();
   const results = {};
 
   await Promise.all(assets.map(async (asset) => {
     try {
       const price = await fetchPrice(asset.ticker);
-      updatePrice(asset.id, price, now);
+      await updatePrice(asset.id, price, now);
       results[asset.id] = { price, updated: now };
     } catch (err) {
       console.error(`Price fetch failed for ${asset.ticker}:`, err.message);
-      const existing = assets.find(a => a.id === asset.id);
-      results[asset.id] = existing?.current_price != null
-        ? { price: existing.current_price, updated: existing.last_updated }
+      results[asset.id] = asset.current_price != null
+        ? { price: asset.current_price, updated: asset.last_updated }
         : null;
     }
   }));
@@ -260,7 +261,7 @@ app.get('/api/prices', async (_req, res) => {
 
 // POST /refresh — Fetch latest prices from Yahoo Finance
 app.post('/refresh', async (_req, res) => {
-  const assets = getAllAssets();
+  const assets = await getAllAssets();
 
   if (assets.length === 0) {
     return res.redirect('/?error=No+assets+to+refresh');
@@ -272,7 +273,7 @@ app.post('/refresh', async (_req, res) => {
   for (const asset of assets) {
     try {
       const price = await fetchPrice(asset.ticker);
-      updatePrice(asset.id, price, now);
+      await updatePrice(asset.id, price, now);
     } catch (err) {
       console.error(`Failed to fetch price for ${asset.ticker}:`, err.message);
       failed.push(asset.ticker);
@@ -290,6 +291,13 @@ app.post('/refresh', async (_req, res) => {
 
 // ─── Start ───────────────────────────────────────────────────────────────────
 
-app.listen(PORT, () => {
-  console.log(`Portfolio tracker running at http://localhost:${PORT}`);
-});
+initDb()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`Portfolio tracker running at http://localhost:${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error('Failed to initialize database:', err);
+    process.exit(1);
+  });
