@@ -10,23 +10,26 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <% if (typeof bgGifUrl !== 'undefined' && bgGifUrl) { %>
   <style>
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background-image: url('<%= bgGifUrl %>');
-      background-size: cover;
-      background-position: center;
-      background-repeat: no-repeat;
-      z-index: -1;
-      opacity: 0.18;
-    }
     body { background: #0f0f14; }
     .card, .navbar { background: rgba(26,26,36,0.92); backdrop-filter: blur(10px); }
+    #bg-gif {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      opacity: 0.18;
+      z-index: -1;
+      pointer-events: none;
+    }
   </style>
   <% } %>
 </head>
 <body>
+  <% if (typeof bgGifUrl !== 'undefined' && bgGifUrl) { %>
+  <img id="bg-gif" src="<%= bgGifUrl %>" alt="" aria-hidden="true" />
+  <% } %>
   <nav class="navbar">
     <div class="nav-brand">
       <% if (typeof profileImageUrl !== 'undefined' && profileImageUrl) { %>
