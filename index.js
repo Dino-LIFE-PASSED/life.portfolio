@@ -422,6 +422,45 @@ app.get('/api/wallets', requireAuth, async (req, res) => {
   res.json(results);
 });
 
+// GET /api/resolve-image — extract direct image URL from any webpage
+app.get('/api/resolve-image', requireAuth, async (req, res) => {
+  const { url } = req.query;
+  if (!url) return res.status(400).json({ error: 'Missing url parameter' });
+
+  // If it already looks like a direct image, return as-is
+  if (/\.(gif|jpg|jpeg|png|webp|svg)(\?.*)?$/i.test(url) ||
+      /^https?:\/\/media\.tenor\.com\//i.test(url) ||
+      /^https?:\/\/i\.giphy\.com\//i.test(url) ||
+      /^https?:\/\/media\d*\.giphy\.com\//i.test(url)) {
+    return res.json({ resolvedUrl: url });
+  }
+
+  try {
+    const r = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; bot)' },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const html = await r.text();
+
+    // Try og:image first
+    const ogMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+                 || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+    if (ogMatch) return res.json({ resolvedUrl: ogMatch[1] });
+
+    // Try twitter:image
+    const twMatch = html.match(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i)
+                 || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/i);
+    if (twMatch) return res.json({ resolvedUrl: twMatch[1] });
+
+    // Fall back to original URL
+    res.json({ resolvedUrl: url });
+  } catch (err) {
+    console.error('resolve-image error:', err.message);
+    res.json({ resolvedUrl: url }); // fall back silently
+  }
+});
+
 // GET /api/rates — USD to THB exchange rate
 app.get('/api/rates', requireAuth, async (_req, res) => {
   try {

@@ -65,25 +65,55 @@
       <form method="POST" action="/profile" class="modal-form">
         <div class="form-group">
           <label class="form-label">Profile Image URL</label>
-          <input type="url" name="profile_image_url" class="form-input"
-            placeholder="https://example.com/avatar.png"
+          <input type="text" id="profileImageInput" name="profile_image_url" class="form-input"
+            placeholder="Paste any link — webpage or direct image"
             value="<%= typeof profileImageUrl !== 'undefined' && profileImageUrl ? profileImageUrl : '' %>" />
-          <p class="form-hint">Link to any image (PNG, JPG, GIF)</p>
+          <p class="form-hint" id="profileImageHint">Paste any URL from Tenor, Giphy, Google Images, etc.</p>
         </div>
         <div class="form-group">
           <label class="form-label">Background GIF URL</label>
-          <input type="url" name="bg_gif_url" class="form-input"
-            placeholder="https://example.com/background.gif"
+          <input type="text" id="bgGifInput" name="bg_gif_url" class="form-input"
+            placeholder="Paste any link — webpage or direct image/GIF"
             value="<%= typeof bgGifUrl !== 'undefined' && bgGifUrl ? bgGifUrl : '' %>" />
-          <p class="form-hint">Paste a GIF URL — displayed as a subtle full-screen background</p>
+          <p class="form-hint" id="bgGifHint">Paste any URL from Tenor, Giphy, Behance, etc.</p>
         </div>
         <div class="modal-actions">
           <button type="button" class="btn btn-ghost" onclick="document.getElementById('profileModal').classList.add('hidden')">Cancel</button>
-          <button type="submit" class="btn btn-primary">Save</button>
+          <button type="submit" id="profileSaveBtn" class="btn btn-primary">Save</button>
         </div>
       </form>
     </div>
   </div>
+
+  <script>
+  (function() {
+    async function resolveUrl(input, hintEl) {
+      const val = input.value.trim();
+      if (!val) return;
+      hintEl.textContent = 'Resolving...';
+      try {
+        const r = await fetch('/api/resolve-image?url=' + encodeURIComponent(val));
+        const d = await r.json();
+        if (d.resolvedUrl && d.resolvedUrl !== val) {
+          input.value = d.resolvedUrl;
+          hintEl.textContent = '✓ Resolved to direct image URL';
+        } else {
+          hintEl.textContent = '✓ URL looks good';
+        }
+      } catch (_) {
+        hintEl.textContent = 'Could not resolve — URL saved as-is';
+      }
+    }
+
+    const profileInput = document.getElementById('profileImageInput');
+    const bgInput = document.getElementById('bgGifInput');
+    const profileHint = document.getElementById('profileImageHint');
+    const bgHint = document.getElementById('bgGifHint');
+
+    if (profileInput) profileInput.addEventListener('blur', () => resolveUrl(profileInput, profileHint));
+    if (bgInput) bgInput.addEventListener('blur', () => resolveUrl(bgInput, bgHint));
+  })();
+  </script>
   <% } %>
 
   <main class="container">
