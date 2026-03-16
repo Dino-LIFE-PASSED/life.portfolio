@@ -33,40 +33,72 @@
   (function() {
     var c = document.getElementById('matrix-bg');
     var ctx = c.getContext('2d');
-    var FS = 16;
+    var FS = 15;
     var CHARS = '0123456789ABCDEF₿$#&|';
-    var BTC = '#F7931A';
-    var BTC_DIM = '#a04e0f';
-    var cols, drops, speeds;
+    var NAV_H = 80;   /* navbar height to fade over */
+    var streams = [];
+
+    function newStream(x) {
+      return {
+        x: x !== undefined ? x : Math.random() * (c.width - FS),
+        y: -Math.random() * c.height,   /* scatter start heights so they don't all begin at once */
+        speed: 0.8 + Math.random() * 2.2,
+        len: 7 + Math.floor(Math.random() * 14),
+        btc: Math.random() < 0.65   /* 65% of streams are BTC orange */
+      };
+    }
+
     function resize() {
       c.width = window.innerWidth;
       c.height = window.innerHeight;
-      /* every 3rd column so the screen isn't packed */
-      cols = Math.floor(c.width / (FS * 3));
-      drops = []; speeds = [];
-      for (var i = 0; i < cols; i++) {
-        drops[i] = Math.random() * -(c.height / FS);
-        speeds[i] = 0.08 + Math.random() * 0.18;   /* much slower */
-      }
+      var n = 12 + Math.floor(c.width / 55);   /* density scales with screen width */
+      streams = [];
+      for (var i = 0; i < n; i++) streams.push(newStream());
     }
+
     function draw() {
-      ctx.fillStyle = 'rgba(15,15,20,0.04)';
-      ctx.fillRect(0, 0, c.width, c.height);
+      /* clear each frame — proper complete fade via explicit per-char alpha */
+      ctx.clearRect(0, 0, c.width, c.height);
       ctx.font = FS + 'px "JetBrains Mono",monospace';
-      for (var i = 0; i < cols; i++) {
-        var ch = CHARS[Math.floor(Math.random() * CHARS.length)];
-        var r = Math.random();
-        if (ch === '₿' || r < 0.55) {
-          ctx.fillStyle = r < 0.25 ? BTC : BTC_DIM;   /* mostly BTC orange */
-        } else {
-          ctx.fillStyle = r < 0.75 ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.25)';
+
+      for (var i = 0; i < streams.length; i++) {
+        var s = streams[i];
+        s.y += s.speed;
+
+        /* reset when tail has fully left the screen */
+        if (s.y - s.len * FS > c.height) {
+          streams[i] = newStream();
+          continue;
         }
-        ctx.fillText(ch, i * FS * 3, drops[i] * FS);
-        if (drops[i] * FS > c.height && Math.random() > 0.975) drops[i] = 0;
-        drops[i] += speeds[i];
+
+        /* draw each character in the stream from tail (top) → head (bottom) */
+        for (var j = s.len; j >= 0; j--) {
+          var py = s.y - j * FS;
+          if (py < 0 || py > c.height) continue;
+          var frac = 1 - j / s.len;   /* 0 at tail tip → 1 at head */
+          var ch = CHARS[Math.floor(Math.random() * CHARS.length)];
+          if (j === 0) {
+            /* head: full brightness */
+            ctx.fillStyle = s.btc ? '#F7931A' : 'rgba(255,255,255,0.95)';
+          } else if (s.btc) {
+            ctx.fillStyle = 'rgba(247,147,26,' + (frac * 0.9).toFixed(2) + ')';
+          } else {
+            ctx.fillStyle = 'rgba(255,255,255,' + (frac * 0.75).toFixed(2) + ')';
+          }
+          ctx.fillText(ch, s.x, py);
+        }
       }
+
+      /* gradient mask over navbar so rain fades out cleanly behind it */
+      var grd = ctx.createLinearGradient(0, 0, 0, NAV_H);
+      grd.addColorStop(0, 'rgba(15,15,20,1)');
+      grd.addColorStop(1, 'rgba(15,15,20,0)');
+      ctx.fillStyle = grd;
+      ctx.fillRect(0, 0, c.width, NAV_H);
+
       requestAnimationFrame(draw);
     }
+
     resize();
     window.addEventListener('resize', resize);
     draw();
