@@ -3,6 +3,7 @@ const { Pool } = require('pg');
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 async function initDb() {
+  // Create tables
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,
@@ -12,7 +13,7 @@ async function initDb() {
     );
     CREATE TABLE IF NOT EXISTS assets (
       id SERIAL PRIMARY KEY,
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
       name TEXT NOT NULL,
       ticker TEXT NOT NULL,
       asset_type TEXT NOT NULL DEFAULT 'stock',
@@ -25,16 +26,33 @@ async function initDb() {
     );
     CREATE TABLE IF NOT EXISTS wallets (
       id SERIAL PRIMARY KEY,
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
       label TEXT NOT NULL,
       address TEXT NOT NULL,
       btc_balance REAL,
       btc_unconfirmed REAL,
       usd_value REAL,
       last_updated TEXT,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(user_id, address)
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
+  `);
+
+  // Migrate existing tables: add user_id if missing
+  await pool.query(`
+    ALTER TABLE assets ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE;
+    ALTER TABLE wallets ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE;
+    ALTER TABLE wallets DROP CONSTRAINT IF EXISTS wallets_address_key;
+  `);
+
+  // Add unique constraint per user if not exists
+  await pool.query(`
+    DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'wallets_user_id_address_key'
+      ) THEN
+        ALTER TABLE wallets ADD CONSTRAINT wallets_user_id_address_key UNIQUE (user_id, address);
+      END IF;
+    END $$;
   `);
 }
 
