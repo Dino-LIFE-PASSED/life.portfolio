@@ -51,6 +51,9 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 async function scanXpub(xpubStr) {
   const type = xpubStr.slice(0, 4); // xpub, ypub, zpub
+  const label = xpubStr.slice(0, 10) + '…';
+  console.log(`[scanXpub] ${label} type=${type} starting`);
+
   const normalized = (type === 'xpub') ? xpubStr : normalizeXpub(xpubStr);
   const master = HDKey.fromExtendedKey(normalized);
   const external = master.derive('m/0'); // external chain
@@ -68,8 +71,8 @@ async function scanXpub(xpubStr) {
     try {
       const r = await fetch(`https://blockstream.info/api/address/${address}`);
       if (r.status === 429) {
-        // Rate limited — wait longer and retry same index
-        await sleep(2000);
+        console.log(`[scanXpub] ${label} rate-limited at index ${index}, waiting 3s`);
+        await sleep(3000);
         continue;
       }
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -82,23 +85,26 @@ async function scanXpub(xpubStr) {
       } else {
         gap = 0;
         totalSats += balance;
+        console.log(`[scanXpub] ${label} index=${index} balance=${balance}sats`);
       }
       retries = 0;
     } catch (err) {
-      console.error(`xpub scan error at index ${index}:`, err.message);
+      console.error(`[scanXpub] ${label} error at index ${index}: ${err.message}`);
       retries++;
       if (retries >= 3) {
-        // Too many failures — give up scanning, return what we have
+        console.error(`[scanXpub] ${label} giving up after 3 retries`);
         break;
       }
       await sleep(1000);
-      continue; // retry same index
+      continue;
     }
     index++;
-    await sleep(150); // 150ms between requests to avoid rate limiting
+    await sleep(150);
   }
 
-  return totalSats / 1e8; // satoshis → BTC
+  const btc = totalSats / 1e8;
+  console.log(`[scanXpub] ${label} done — scanned ${index} addresses, total=${btc} BTC`);
+  return btc;
 }
 
 const app = express();

@@ -182,9 +182,10 @@
                 <span class="wallet-addr"><%= w.address.slice(0,8) %>…<%= w.address.slice(-6) %></span>
               <% } %>
             </td>
-            <td class="num cell-btc-balance"><%= w.btc_balance != null ? w.btc_balance.toFixed(8) : '—' %></td>
+            <% var isXpubWallet = /^[xyz]pub/.test(w.address); %>
+            <td class="num cell-btc-balance"><%= w.btc_balance != null ? w.btc_balance.toFixed(8) : (isXpubWallet ? 'Scanning…' : '—') %></td>
             <td class="num cell-btc-unconfirmed" style="color:var(--text-dim)"><%= w.btc_unconfirmed != null ? w.btc_unconfirmed.toFixed(8) : '—' %></td>
-            <td class="num cell-wallet-usd"><%= w.usd_value != null ? '$' + w.usd_value.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) : '—' %></td>
+            <td class="num cell-wallet-usd"><%= w.usd_value != null ? '$' + w.usd_value.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) : (isXpubWallet ? 'Scanning…' : '—') %></td>
           </tr>
           <% }); %>
         </tbody>
