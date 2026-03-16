@@ -27,6 +27,54 @@
   <% } %>
 </head>
 <body>
+  <!-- Matrix rain background -->
+  <canvas id="matrix-bg" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:-2;"></canvas>
+  <script>
+  (function() {
+    var c = document.getElementById('matrix-bg');
+    var ctx = c.getContext('2d');
+    var FS = 13;
+    var CHARS = '0123456789ABCDEFabcdef₿$#{}[]<>=+|&!;';
+    var BTC = '#F7931A';
+    var cols, drops, speeds;
+    function resize() {
+      c.width = window.innerWidth;
+      c.height = window.innerHeight;
+      cols = Math.floor(c.width / FS);
+      drops = []; speeds = [];
+      for (var i = 0; i < cols; i++) {
+        drops[i] = Math.random() * -(c.height / FS);
+        speeds[i] = 0.18 + Math.random() * 0.45;
+      }
+    }
+    function draw() {
+      ctx.fillStyle = 'rgba(15,15,20,0.055)';
+      ctx.fillRect(0, 0, c.width, c.height);
+      ctx.font = FS + 'px "JetBrains Mono",monospace';
+      for (var i = 0; i < cols; i++) {
+        var ch = CHARS[Math.floor(Math.random() * CHARS.length)];
+        var r = Math.random();
+        if (ch === '₿') {
+          ctx.fillStyle = BTC;
+        } else if (r < 0.08) {
+          ctx.fillStyle = '#F7931A';           /* BTC orange accent */
+        } else if (r < 0.3) {
+          ctx.fillStyle = 'rgba(255,255,255,0.85)';
+        } else {
+          ctx.fillStyle = 'rgba(255,255,255,0.2)';
+        }
+        ctx.fillText(ch, i * FS, drops[i] * FS);
+        if (drops[i] * FS > c.height && Math.random() > 0.975) drops[i] = 0;
+        drops[i] += speeds[i];
+      }
+      requestAnimationFrame(draw);
+    }
+    resize();
+    window.addEventListener('resize', resize);
+    draw();
+  })();
+  </script>
+
   <% if (typeof hasBgGif !== 'undefined' && hasBgGif) { %>
   <img id="bg-gif" src="/api/profile/bg?t=<%= Date.now() %>" alt="" aria-hidden="true" />
   <% } %>
