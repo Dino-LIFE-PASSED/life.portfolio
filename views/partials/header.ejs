@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-  <% if (typeof bgGifUrl !== 'undefined' && bgGifUrl) { %>
+  <% if (typeof hasBgGif !== 'undefined' && hasBgGif) { %>
   <style>
     body { background: #0f0f14; }
     .card, .navbar { background: rgba(26,26,36,0.92); backdrop-filter: blur(10px); }
@@ -27,13 +27,13 @@
   <% } %>
 </head>
 <body>
-  <% if (typeof bgGifUrl !== 'undefined' && bgGifUrl) { %>
-  <img id="bg-gif" src="<%= bgGifUrl %>" alt="" aria-hidden="true" />
+  <% if (typeof hasBgGif !== 'undefined' && hasBgGif) { %>
+  <img id="bg-gif" src="/api/profile/bg" alt="" aria-hidden="true" />
   <% } %>
   <nav class="navbar">
     <div class="nav-brand">
-      <% if (typeof profileImageUrl !== 'undefined' && profileImageUrl) { %>
-        <img src="<%= profileImageUrl %>" alt="Profile" class="nav-avatar" />
+      <% if (typeof hasProfileImage !== 'undefined' && hasProfileImage) { %>
+        <img src="/api/profile/avatar" alt="Profile" class="nav-avatar" />
       <% } else { %>
         <span class="nav-logo">&#9682;</span>
       <% } %>
@@ -44,8 +44,8 @@
       <a href="/add" class="nav-link btn-nav <%= typeof activePage !== 'undefined' && activePage === 'add' ? 'active' : '' %>">+ Add</a>
       <% if (typeof username !== 'undefined' && username) { %>
         <button class="btn-profile" onclick="document.getElementById('profileModal').classList.remove('hidden')" title="Profile settings">
-          <% if (typeof profileImageUrl !== 'undefined' && profileImageUrl) { %>
-            <img src="<%= profileImageUrl %>" alt="Profile" class="btn-profile-img" />
+          <% if (typeof hasProfileImage !== 'undefined' && hasProfileImage) { %>
+            <img src="/api/profile/avatar" alt="Profile" class="btn-profile-img" />
           <% } else { %>
             <span class="btn-profile-initial"><%= username[0].toUpperCase() %></span>
           <% } %>
@@ -70,8 +70,7 @@
           <label class="form-label">Profile Image</label>
           <div class="upload-row">
             <input type="text" id="profileImageInput" name="profile_image_url" class="form-input"
-              placeholder="Paste a URL or upload a file"
-              value="<%= typeof profileImageUrl !== 'undefined' && profileImageUrl ? profileImageUrl : '' %>" />
+              placeholder="Paste a URL or upload a file" value="" />
             <label class="btn btn-ghost btn-sm upload-label" title="Upload from device">
               &#128247; Upload
               <input type="file" accept="image/*,.gif" style="display:none" id="profileImageFile" />
@@ -83,8 +82,7 @@
           <label class="form-label">Background GIF / Image</label>
           <div class="upload-row">
             <input type="text" id="bgGifInput" name="bg_gif_url" class="form-input"
-              placeholder="Paste a URL or upload a file"
-              value="<%= typeof bgGifUrl !== 'undefined' && bgGifUrl ? bgGifUrl : '' %>" />
+              placeholder="Paste a URL or upload a file" value="" />
             <label class="btn btn-ghost btn-sm upload-label" title="Upload from device">
               &#128247; Upload
               <input type="file" accept="image/*,.gif" style="display:none" id="bgGifFile" />
@@ -94,7 +92,7 @@
         </div>
         <div class="modal-actions">
           <button type="button" class="btn btn-ghost" onclick="document.getElementById('profileModal').classList.add('hidden')">Cancel</button>
-          <button type="submit" id="profileSaveBtn" class="btn btn-primary">Save</button>
+          <button type="submit" class="btn btn-primary">Save</button>
         </div>
       </form>
     </div>
@@ -123,7 +121,7 @@
         try {
           const dataUrl = await fileToBase64(file);
           textInput.value = dataUrl;
-          hint.textContent = '✓ ' + file.name + ' loaded';
+          hint.textContent = '✓ ' + file.name + ' ready — click Save';
         } catch (_) {
           hint.textContent = 'Failed to load file';
         }
@@ -139,7 +137,7 @@
         const d = await r.json();
         if (d.resolvedUrl && d.resolvedUrl !== val) {
           input.value = d.resolvedUrl;
-          hintEl.textContent = '✓ Resolved to direct image URL';
+          hintEl.textContent = '✓ Resolved';
         } else {
           hintEl.textContent = '✓ URL looks good';
         }

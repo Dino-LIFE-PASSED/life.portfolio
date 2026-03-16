@@ -195,8 +195,8 @@ app.post('/login', async (req, res) => {
 
   req.session.userId = user.id;
   req.session.username = user.username;
-  req.session.profileImageUrl = user.profile_image_url || null;
-  req.session.bgGifUrl = user.bg_gif_url || null;
+  req.session.hasProfileImage = !!user.profile_image_url;
+  req.session.hasBgGif = !!user.bg_gif_url;
   res.redirect('/');
 });
 
@@ -226,8 +226,8 @@ app.post('/register', async (req, res) => {
 
   req.session.userId = user.id;
   req.session.username = user.username;
-  req.session.profileImageUrl = null;
-  req.session.bgGifUrl = null;
+  req.session.hasProfileImage = false;
+  req.session.hasBgGif = false;
   res.redirect('/');
 });
 
@@ -235,9 +235,44 @@ app.post('/register', async (req, res) => {
 app.post('/profile', requireAuth, async (req, res) => {
   const { profile_image_url, bg_gif_url } = req.body;
   const updated = await updateUserProfile(req.session.userId, profile_image_url, bg_gif_url);
-  req.session.profileImageUrl = updated.profile_image_url;
-  req.session.bgGifUrl = updated.bg_gif_url;
+  // Store a flag in session so header knows whether images exist
+  req.session.hasProfileImage = !!updated.profile_image_url;
+  req.session.hasBgGif = !!updated.bg_gif_url;
   res.redirect('/?success=Profile+updated');
+});
+
+// GET /api/profile/avatar — serve profile image as binary
+app.get('/api/profile/avatar', requireAuth, async (req, res) => {
+  const { rows } = await pool.query('SELECT profile_image_url FROM users WHERE id=$1', [req.session.userId]);
+  const url = rows[0]?.profile_image_url;
+  if (!url) return res.status(404).end();
+  if (url.startsWith('data:')) {
+    const [meta, b64] = url.split(',');
+    const mimeMatch = meta.match(/data:([^;]+)/);
+    const mime = mimeMatch ? mimeMatch[1] : 'image/gif';
+    const buf = Buffer.from(b64, 'base64');
+    res.set('Content-Type', mime);
+    res.set('Cache-Control', 'private, max-age=3600');
+    return res.send(buf);
+  }
+  res.redirect(url);
+});
+
+// GET /api/profile/bg — serve background gif as binary
+app.get('/api/profile/bg', requireAuth, async (req, res) => {
+  const { rows } = await pool.query('SELECT bg_gif_url FROM users WHERE id=$1', [req.session.userId]);
+  const url = rows[0]?.bg_gif_url;
+  if (!url) return res.status(404).end();
+  if (url.startsWith('data:')) {
+    const [meta, b64] = url.split(',');
+    const mimeMatch = meta.match(/data:([^;]+)/);
+    const mime = mimeMatch ? mimeMatch[1] : 'image/gif';
+    const buf = Buffer.from(b64, 'base64');
+    res.set('Content-Type', mime);
+    res.set('Cache-Control', 'private, max-age=3600');
+    return res.send(buf);
+  }
+  res.redirect(url);
 });
 
 // POST /logout
@@ -267,16 +302,16 @@ app.get('/', requireAuth, async (req, res) => {
     chart,
     wallets,
     username: req.session.username,
-    profileImageUrl: req.session.profileImageUrl || null,
-    bgGifUrl: req.session.bgGifUrl || null,
+    hasProfileImage: !!req.session.hasProfileImage,
+    hasBgGif: !!req.session.hasBgGif,
     error: req.query.error || null,
     success: req.query.success || null,
   });
 });
 
 // GET /add
-app.get('/add', requireAuth, (_req, res) => {
-  res.render('add', { error: null, formData: {} });
+app.get('/add', requireAuth, (req, res) => {
+  res.render('add', { error: null, formData: {}, username: req.session.username, hasProfileImage: !!req.session.hasProfileImage, hasBgGif: !!req.session.hasBgGif });
 });
 
 // POST /add
@@ -315,7 +350,7 @@ app.post('/add', requireAuth, async (req, res) => {
 app.get('/edit/:id', requireAuth, async (req, res) => {
   const asset = await getAssetById(parseInt(req.params.id, 10), req.session.userId);
   if (!asset) return res.redirect('/?error=Asset+not+found');
-  res.render('edit', { error: null, asset });
+  res.render('edit', { error: null, asset, username: req.session.username, hasProfileImage: !!req.session.hasProfileImage, hasBgGif: !!req.session.hasBgGif });
 });
 
 // POST /edit/:id
