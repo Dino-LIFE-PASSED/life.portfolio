@@ -7,7 +7,7 @@ const pgSession = require('connect-pg-simple')(session);
 const HDKey = require('hdkey');
 const bs58check = require('bs58check');
 const { bech32 } = require('bech32');
-const { pool, initDb, createUser, getUserByUsername,
+const { pool, initDb, createUser, getUserByUsername, updateUserProfile,
         getAllAssets, getAssetById, addAsset, updateAsset, deleteAsset, updatePrice,
         getAllWallets, addWallet, deleteWallet, updateWalletBalance } = require('./db');
 
@@ -179,6 +179,8 @@ app.post('/login', async (req, res) => {
 
   req.session.userId = user.id;
   req.session.username = user.username;
+  req.session.profileImageUrl = user.profile_image_url || null;
+  req.session.bgGifUrl = user.bg_gif_url || null;
   res.redirect('/');
 });
 
@@ -208,7 +210,18 @@ app.post('/register', async (req, res) => {
 
   req.session.userId = user.id;
   req.session.username = user.username;
+  req.session.profileImageUrl = null;
+  req.session.bgGifUrl = null;
   res.redirect('/');
+});
+
+// POST /profile
+app.post('/profile', requireAuth, async (req, res) => {
+  const { profile_image_url, bg_gif_url } = req.body;
+  const updated = await updateUserProfile(req.session.userId, profile_image_url, bg_gif_url);
+  req.session.profileImageUrl = updated.profile_image_url;
+  req.session.bgGifUrl = updated.bg_gif_url;
+  res.redirect('/?success=Profile+updated');
 });
 
 // POST /logout
@@ -229,6 +242,8 @@ app.get('/', requireAuth, async (req, res) => {
     chart,
     wallets,
     username: req.session.username,
+    profileImageUrl: req.session.profileImageUrl || null,
+    bgGifUrl: req.session.bgGifUrl || null,
     error: req.query.error || null,
     success: req.query.success || null,
   });

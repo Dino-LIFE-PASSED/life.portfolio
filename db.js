@@ -37,8 +37,10 @@ async function initDb() {
     );
   `);
 
-  // Migrate existing tables: add user_id if missing
+  // Migrate existing tables
   await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_image_url TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS bg_gif_url TEXT;
     ALTER TABLE assets ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE;
     ALTER TABLE wallets ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE;
     ALTER TABLE wallets DROP CONSTRAINT IF EXISTS wallets_address_key;
@@ -72,6 +74,14 @@ async function getUserByUsername(username) {
     [username]
   );
   return rows[0] || null;
+}
+
+async function updateUserProfile(id, profileImageUrl, bgGifUrl) {
+  const { rows } = await pool.query(
+    'UPDATE users SET profile_image_url=$1, bg_gif_url=$2 WHERE id=$3 RETURNING profile_image_url, bg_gif_url',
+    [profileImageUrl || null, bgGifUrl || null, id]
+  );
+  return rows[0];
 }
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
@@ -150,7 +160,7 @@ async function updateWalletBalance(id, btc_balance, btc_unconfirmed, usd_value, 
 module.exports = {
   pool,
   initDb,
-  createUser, getUserByUsername,
+  createUser, getUserByUsername, updateUserProfile,
   getAllAssets, getAssetById, addAsset, updateAsset, deleteAsset, updatePrice,
   getAllWallets, addWallet, deleteWallet, updateWalletBalance,
 };

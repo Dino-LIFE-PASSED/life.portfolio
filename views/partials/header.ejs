@@ -8,22 +8,82 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <% if (typeof bgGifUrl !== 'undefined' && bgGifUrl) { %>
+  <style>
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url('<%= bgGifUrl %>');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      z-index: -1;
+      opacity: 0.18;
+    }
+    body { background: #0f0f14; }
+    .card, .navbar { background: rgba(26,26,36,0.92); backdrop-filter: blur(10px); }
+  </style>
+  <% } %>
 </head>
 <body>
   <nav class="navbar">
     <div class="nav-brand">
-      <span class="nav-logo">&#9682;</span>
+      <% if (typeof profileImageUrl !== 'undefined' && profileImageUrl) { %>
+        <img src="<%= profileImageUrl %>" alt="Profile" class="nav-avatar" />
+      <% } else { %>
+        <span class="nav-logo">&#9682;</span>
+      <% } %>
       <span class="nav-title">life.portfolio</span>
     </div>
     <div class="nav-links">
       <a href="/" class="nav-link <%= typeof activePage !== 'undefined' && activePage === 'dashboard' ? 'active' : '' %>">Dashboard</a>
-      <a href="/add" class="nav-link btn-nav <%= typeof activePage !== 'undefined' && activePage === 'add' ? 'active' : '' %>">+ Add Asset</a>
+      <a href="/add" class="nav-link btn-nav <%= typeof activePage !== 'undefined' && activePage === 'add' ? 'active' : '' %>">+ Add</a>
       <% if (typeof username !== 'undefined' && username) { %>
-        <span class="nav-user">&#128100; <%= username %></span>
+        <button class="btn-profile" onclick="document.getElementById('profileModal').classList.remove('hidden')" title="Profile settings">
+          <% if (typeof profileImageUrl !== 'undefined' && profileImageUrl) { %>
+            <img src="<%= profileImageUrl %>" alt="Profile" class="btn-profile-img" />
+          <% } else { %>
+            <span class="btn-profile-initial"><%= username[0].toUpperCase() %></span>
+          <% } %>
+        </button>
         <form method="POST" action="/logout" style="display:inline;">
           <button type="submit" class="btn-logout">Logout</button>
         </form>
       <% } %>
     </div>
   </nav>
+
+  <% if (typeof username !== 'undefined' && username) { %>
+  <!-- Profile Settings Modal -->
+  <div id="profileModal" class="modal-overlay hidden" onclick="if(event.target===this)this.classList.add('hidden')">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title">Profile Settings</h2>
+        <button class="modal-close" onclick="document.getElementById('profileModal').classList.add('hidden')">&#10005;</button>
+      </div>
+      <form method="POST" action="/profile" class="modal-form">
+        <div class="form-group">
+          <label class="form-label">Profile Image URL</label>
+          <input type="url" name="profile_image_url" class="form-input"
+            placeholder="https://example.com/avatar.png"
+            value="<%= typeof profileImageUrl !== 'undefined' && profileImageUrl ? profileImageUrl : '' %>" />
+          <p class="form-hint">Link to any image (PNG, JPG, GIF)</p>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Background GIF URL</label>
+          <input type="url" name="bg_gif_url" class="form-input"
+            placeholder="https://example.com/background.gif"
+            value="<%= typeof bgGifUrl !== 'undefined' && bgGifUrl ? bgGifUrl : '' %>" />
+          <p class="form-hint">Paste a GIF URL — displayed as a subtle full-screen background</p>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" onclick="document.getElementById('profileModal').classList.add('hidden')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <% } %>
+
   <main class="container">

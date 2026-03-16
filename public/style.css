@@ -817,3 +817,162 @@ input[type="number"]::-webkit-outer-spin-button {
   border-color: var(--negative);
   color: var(--negative);
 }
+
+/* ─── Profile avatar in navbar ──────────────────────────────────────────── */
+.nav-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--accent);
+}
+
+.btn-profile {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--bg-card-2);
+  cursor: pointer;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color var(--transition);
+  flex-shrink: 0;
+}
+
+.btn-profile:hover { border-color: var(--accent); }
+
+.btn-profile-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.btn-profile-initial {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+/* ─── Profile / settings modal ──────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.modal-overlay.hidden { display: none; }
+
+.modal-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px;
+  width: 100%;
+  max-width: 460px;
+  box-shadow: var(--shadow);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.modal-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.modal-close {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: color var(--transition), background var(--transition);
+}
+
+.modal-close:hover { color: var(--text); background: var(--bg-card-2); }
+
+.modal-form { display: flex; flex-direction: column; gap: 20px; }
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+/* ─── Mobile responsiveness ─────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  /* Navbar */
+  .navbar { padding: 0 12px; height: 56px; }
+  .nav-title { font-size: 15px; }
+  .nav-logo { font-size: 18px; }
+  .nav-link:not(.btn-nav):not(.active) { display: none; }
+  .nav-user { display: none; }
+  .btn-logout { padding: 5px 10px; font-size: 12px; }
+
+  /* Container */
+  .container { padding: 16px 12px 48px; }
+
+  /* Page header */
+  .page-header { flex-direction: column; align-items: flex-start; gap: 10px; margin-bottom: 20px; }
+  .page-title { font-size: 20px; }
+
+  /* Summary cards */
+  .summary-grid { grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+  .summary-card { padding: 14px 16px; }
+  .card-value { font-size: 18px; }
+  .card-label { font-size: 10px; }
+
+  /* Dashboard grid */
+  .dashboard-grid { gap: 14px; }
+
+  /* Tables: make them scrollable */
+  .table-wrapper { -webkit-overflow-scrolling: touch; }
+  .assets-table { font-size: 12px; }
+  .assets-table th, .assets-table td { padding: 10px 10px; }
+
+  /* Wallet form */
+  .inline-form { flex-direction: column; }
+  .inline-form .form-input { width: 100%; }
+  .inline-form .btn { width: 100%; justify-content: center; }
+
+  /* Forms */
+  .form-card { padding: 20px 16px; }
+  .asset-form { gap: 20px; }
+  .form-actions { flex-direction: column-reverse; }
+  .form-actions .btn { width: 100%; justify-content: center; }
+  .btn-lg { padding: 12px 24px; font-size: 14px; }
+
+  /* Chart */
+  .chart-wrapper canvas { max-width: 160px; max-height: 160px; }
+
+  /* Auth */
+  .auth-card { padding: 28px 20px; }
+
+  /* Modal */
+  .modal-card { padding: 20px 16px; }
+  .modal-actions { flex-direction: column-reverse; }
+  .modal-actions .btn { width: 100%; justify-content: center; }
+}
+
+@media (max-width: 400px) {
+  .summary-grid { grid-template-columns: 1fr; }
+}

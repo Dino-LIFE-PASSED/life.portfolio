@@ -1,4 +1,4 @@
-<%- include('partials/header', { pageTitle: 'Dashboard — life.portfolio', activePage: 'dashboard', username: username }) %>
+<%- include('partials/header', { pageTitle: 'Dashboard — life.portfolio', activePage: 'dashboard', username: username, profileImageUrl: profileImageUrl, bgGifUrl: bgGifUrl }) %>
 
 <%
   function fmt(n) {
@@ -65,14 +65,7 @@
   </div>
 </section>
 
-<% if (assets.length === 0) { %>
-  <section class="empty-state card">
-    <div class="empty-icon">&#128200;</div>
-    <h2>No assets yet</h2>
-    <p>Start building your portfolio by adding your first investment.</p>
-    <a href="/add" class="btn btn-primary">+ Add Your First Asset</a>
-  </section>
-<% } else { %>
+<% if (assets.length > 0) { %>
 
   <section class="dashboard-grid">
 
