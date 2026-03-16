@@ -46,16 +46,14 @@
         </div>
       </div>
 
-      <div class="form-row">
-        <div class="form-group">
-          <label for="asset_type" class="form-label">Asset Type <span class="required">*</span></label>
-          <select id="asset_type" name="asset_type" class="form-input form-select" required>
-            <option value="stock" <%= asset.asset_type === 'stock' ? 'selected' : '' %>>Stock</option>
-            <option value="etf" <%= asset.asset_type === 'etf' ? 'selected' : '' %>>ETF</option>
-            <option value="crypto" <%= asset.asset_type === 'crypto' ? 'selected' : '' %>>Crypto</option>
-          </select>
-          <p class="form-hint">Category of this investment</p>
-        </div>
+      <div class="form-group">
+        <label for="asset_type" class="form-label">Asset Type <span class="required">*</span></label>
+        <select id="asset_type" name="asset_type" class="form-input form-select" required>
+          <option value="stock" <%= asset.asset_type === 'stock' ? 'selected' : '' %>>Stock</option>
+          <option value="etf" <%= asset.asset_type === 'etf' ? 'selected' : '' %>>ETF</option>
+          <option value="crypto" <%= asset.asset_type === 'crypto' ? 'selected' : '' %>>Crypto</option>
+        </select>
+        <p class="form-hint">Category of this investment</p>
       </div>
 
       <div class="form-row">

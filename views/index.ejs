@@ -1,4 +1,4 @@
-<%- include('partials/header', { pageTitle: 'Dashboard — life.portfolio', activePage: 'dashboard' }) %>
+<%- include('partials/header', { pageTitle: 'Dashboard — life.portfolio', activePage: 'dashboard', username: username }) %>
 
 <%
   function fmt(n) {
@@ -22,8 +22,9 @@
 <div class="page-header">
   <div>
     <h1 class="page-title">Portfolio Dashboard</h1>
-    <p class="page-subtitle">Track your investments in real time &nbsp;<span class="live-badge">&#9679; LIVE</span> <span id="live-status" style="font-size:11px;color:var(--text-dim)"></span></p>
+    <p class="page-subtitle">Track your investments in real time &nbsp;<span class="live-badge">&#9679; LIVE</span></p>
   </div>
+  <button id="thbToggle" class="btn btn-ghost btn-sm" style="font-size:13px;">Show in THB</button>
 </div>
 
 <% if (error) { %>
@@ -37,7 +38,7 @@
 <section class="summary-grid">
   <div class="card summary-card">
     <p class="card-label">Total Invested</p>
-    <p class="card-value">$<%= fmt(summary.total_invested) %></p>
+    <p class="card-value" id="card-total-invested">$<%= fmt(summary.total_invested) %></p>
     <p class="card-sub"><%= summary.asset_count %> asset<%= summary.asset_count !== 1 ? 's' : '' %></p>
   </div>
   <div class="card summary-card">
@@ -65,7 +66,6 @@
 </section>
 
 <% if (assets.length === 0) { %>
-  <!-- Empty state -->
   <section class="empty-state card">
     <div class="empty-icon">&#128200;</div>
     <h2>No assets yet</h2>
@@ -74,7 +74,6 @@
   </section>
 <% } else { %>
 
-  <!-- Main content: table + chart -->
   <section class="dashboard-grid">
 
     <!-- Assets Table -->
@@ -97,7 +96,6 @@
               <th class="num">Cur. Value</th>
               <th class="num">Return $</th>
               <th class="num">Return %</th>
-              <th class="num">Updated</th>
             </tr>
           </thead>
           <tbody>
@@ -113,18 +111,11 @@
               <td><span class="ticker-badge"><%= a.ticker %></span></td>
               <td><span class="type-badge type-<%= a.asset_type %>"><%= a.asset_type.toUpperCase() %></span></td>
               <td class="num"><%= a.quantity %></td>
-              <td class="num">$<%= fmt(a.buy_price) %></td>
+              <td class="num cell-buy-price">$<%= fmt(a.buy_price) %></td>
               <td class="num cell-cur-price"><%= a.current_price != null ? '$' + fmt(a.current_price) : '—' %></td>
               <td class="num cell-cur-value"><%= a.current_value != null ? '$' + fmt(a.current_value) : '—' %></td>
               <td class="num cell-return-dollar <%= signClass(a.return_dollar) %>"><%= fmtDollar(a.return_dollar) %></td>
               <td class="num cell-return-pct <%= signClass(a.return_pct) %>"><%= fmtPct(a.return_pct) %></td>
-              <td class="num cell-updated">
-                <% if (a.last_updated) { %>
-                  <%= new Date(a.last_updated).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) %>
-                <% } else { %>
-                  —
-                <% } %>
-              </td>
             </tr>
             <% }); %>
           </tbody>
@@ -158,14 +149,17 @@
     <div id="wallet-form" class="wallet-add-form hidden">
       <form action="/wallet/add" method="POST" class="inline-form">
         <input type="text" name="label" class="form-input" placeholder="Label (e.g. Cold Wallet)" required />
-        <input type="text" name="address" class="form-input" placeholder="Bitcoin address (bc1...)" required style="flex:2" />
+        <input type="text" name="address" class="form-input" placeholder="Bitcoin address or xPub/yPub/zPub" required style="flex:2" />
         <button type="submit" class="btn btn-primary">Add</button>
         <button type="button" class="btn btn-ghost" onclick="document.getElementById('wallet-form').classList.add('hidden')">Cancel</button>
       </form>
+      <p style="font-size:12px;color:var(--text-dim);margin-top:6px;padding:0 4px;">
+        Single address (bc1..., 1..., 3...) or extended public key (xpub..., ypub..., zpub...). xPub scans all derived addresses automatically.
+      </p>
     </div>
 
     <% if (wallets.length === 0) { %>
-      <p class="wallet-empty">No wallets tracked yet. Add a Bitcoin address above.</p>
+      <p class="wallet-empty">No wallets tracked yet. Add a Bitcoin address or xPub above.</p>
     <% } else { %>
     <div class="table-wrapper">
       <table class="assets-table">
@@ -173,11 +167,10 @@
           <tr>
             <th></th>
             <th>Label</th>
-            <th>Address</th>
+            <th>Source</th>
             <th class="num">BTC Balance</th>
             <th class="num">Unconfirmed</th>
-            <th class="num">USD Value</th>
-            <th class="num">Updated</th>
+            <th class="num">Value</th>
           </tr>
         </thead>
         <tbody id="wallets-tbody">
@@ -189,13 +182,16 @@
               </form>
             </td>
             <td class="asset-name"><%= w.label %></td>
-            <td><span class="wallet-addr"><%= w.address.slice(0,8) %>…<%= w.address.slice(-6) %></span></td>
+            <td>
+              <% if (/^[xyz]pub/.test(w.address)) { %>
+                <span class="ticker-badge" title="<%= w.address %>">xPub ···<%= w.address.slice(-6) %></span>
+              <% } else { %>
+                <span class="wallet-addr"><%= w.address.slice(0,8) %>…<%= w.address.slice(-6) %></span>
+              <% } %>
+            </td>
             <td class="num cell-btc-balance"><%= w.btc_balance != null ? w.btc_balance.toFixed(8) : '—' %></td>
             <td class="num cell-btc-unconfirmed" style="color:var(--text-dim)"><%= w.btc_unconfirmed != null ? w.btc_unconfirmed.toFixed(8) : '—' %></td>
             <td class="num cell-wallet-usd"><%= w.usd_value != null ? '$' + w.usd_value.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) : '—' %></td>
-            <td class="num cell-wallet-updated" style="color:var(--text-dim)">
-              <%= w.last_updated ? new Date(w.last_updated).toLocaleTimeString('en-US', {hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '—' %>
-            </td>
           </tr>
           <% }); %>
         </tbody>
@@ -205,169 +201,176 @@
   </div>
 </section>
 
-<!-- Server data for chart (parsed by JS, not injected inline) -->
 <script type="application/json" id="chartData"><%- JSON.stringify({ labels: chart.labels, values: chart.values }) %></script>
-
-<!-- Chart.js from CDN -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 <script>
-  (function () {
-    const chartData = JSON.parse(document.getElementById('chartData').textContent);
-    const labels = chartData.labels;
-    const values = chartData.values;
-
-    if (!labels.length) return;
-
-    const COLORS = [
-      '#6c63ff', '#00e676', '#ff9100', '#00b0ff', '#ff4081',
-      '#69f0ae', '#ffea00', '#40c4ff', '#ea80fc', '#ff6d00',
-      '#b2ff59', '#f50057', '#18ffff', '#ffab40', '#e040fb'
-    ];
-
-    const ctx = document.getElementById('allocationChart');
-    if (!ctx) return;
-
-    const total = values.reduce((s, v) => s + v, 0);
-
-    new Chart(ctx, {
-      type: 'doughnut',
-      data: {
-        labels,
-        datasets: [{
-          data: values,
-          backgroundColor: COLORS.slice(0, labels.length),
-          borderColor: '#0f0f14',
-          borderWidth: 3,
-          hoverOffset: 8,
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: true,
-        cutout: '62%',
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: function (ctx) {
-                const val = ctx.parsed;
-                const pct = total > 0 ? ((val / total) * 100).toFixed(1) : 0;
-                return ` $${val.toLocaleString('en-US', { minimumFractionDigits: 2 })} (${pct}%)`;
-              }
-            }
-          }
-        }
+(function () {
+  const chartData = JSON.parse(document.getElementById('chartData').textContent);
+  const labels = chartData.labels;
+  const values = chartData.values;
+  if (!labels.length) return;
+  const COLORS = [
+    '#6c63ff','#00e676','#ff9100','#00b0ff','#ff4081',
+    '#69f0ae','#ffea00','#40c4ff','#ea80fc','#ff6d00',
+    '#b2ff59','#f50057','#18ffff','#ffab40','#e040fb'
+  ];
+  const ctx = document.getElementById('allocationChart');
+  if (!ctx) return;
+  const total = values.reduce((s, v) => s + v, 0);
+  new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{ data: values, backgroundColor: COLORS.slice(0, labels.length), borderColor: '#0f0f14', borderWidth: 3, hoverOffset: 8 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true, cutout: '62%',
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ` $${ctx.parsed.toLocaleString('en-US',{minimumFractionDigits:2})} (${total>0?((ctx.parsed/total)*100).toFixed(1):0}%)` } }
       }
-    });
-
-    // Custom legend
-    const legend = document.getElementById('chartLegend');
-    labels.forEach((label, i) => {
-      const pct = total > 0 ? ((values[i] / total) * 100).toFixed(1) : 0;
-      const li = document.createElement('li');
-      li.innerHTML = `
-        <span class="legend-dot" style="background:${COLORS[i % COLORS.length]}"></span>
-        <span class="legend-label">${label}</span>
-        <span class="legend-pct">${pct}%</span>
-      `;
-      legend.appendChild(li);
-    });
-  })();
+    }
+  });
+  const legend = document.getElementById('chartLegend');
+  labels.forEach((label, i) => {
+    const pct = total > 0 ? ((values[i] / total) * 100).toFixed(1) : 0;
+    const li = document.createElement('li');
+    li.innerHTML = `<span class="legend-dot" style="background:${COLORS[i%COLORS.length]}"></span><span class="legend-label">${label}</span><span class="legend-pct">${pct}%</span>`;
+    legend.appendChild(li);
+  });
+})();
 </script>
 
 <script>
 (function () {
-  function fmt(n) {
-    return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // ─── Currency state ───────────────────────────────────────────────────────
+  let usdToThb = null;
+  let showThb = false;
+
+  const thbBtn = document.getElementById('thbToggle');
+
+  async function fetchRate() {
+    try {
+      const r = await fetch('/api/rates');
+      if (!r.ok) return;
+      const d = await r.json();
+      usdToThb = d.usdToThb;
+    } catch (_) {}
   }
-  function fmtDollar(n) {
-    return (n >= 0 ? '+$' : '-$') + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  thbBtn.addEventListener('click', async () => {
+    if (!usdToThb) await fetchRate();
+    if (!usdToThb) return;
+    showThb = !showThb;
+    thbBtn.textContent = showThb ? 'Show in USD' : 'Show in THB';
+    renderAllValues();
+  });
+
+  // ─── Formatters ───────────────────────────────────────────────────────────
+  function fmtMoney(usdVal) {
+    if (usdVal == null) return '—';
+    if (showThb && usdToThb) {
+      const thb = usdVal * usdToThb;
+      return '฿' + thb.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    }
+    return '$' + usdVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function fmtReturn(usdVal) {
+    if (usdVal == null) return '—';
+    const val = showThb && usdToThb ? usdVal * usdToThb : usdVal;
+    const sym = showThb ? '฿' : '$';
+    return (val >= 0 ? '+' + sym : '-' + sym) + Math.abs(val).toLocaleString('en-US', { minimumFractionDigits: showThb ? 0 : 2, maximumFractionDigits: showThb ? 0 : 2 });
   }
   function fmtPct(n) {
+    if (n == null) return '—';
     return (n >= 0 ? '+' : '') + n.toFixed(2) + '%';
   }
 
-  const liveStatus = document.getElementById('live-status');
+  // ─── Live data stores ─────────────────────────────────────────────────────
+  let assetRows = {}; // id → { curValue, retDollar, retPct, buyPrice, qty }
+  let walletRows = {}; // id → usd
+  let totalInvested = 0;
 
-  async function refreshPrices() {
-    let data;
-    try {
-      const res = await fetch('/api/prices?t=' + Date.now());
-      if (!res.ok) throw new Error('bad status ' + res.status);
-      data = await res.json();
-    } catch (e) {
-      if (liveStatus) liveStatus.textContent = 'Error';
-      setTimeout(refreshPrices, 2000);
-      return;
-    }
-
-    let totalInvested = 0, totalValue = 0;
-
+  function renderAllValues() {
+    let assetTotal = 0;
     document.querySelectorAll('tr[data-asset-id]').forEach(row => {
       const id = row.dataset.assetId;
-      const entry = data[id];
-      const buyPrice = parseFloat(row.dataset.buyPrice);
-      const qty = parseFloat(row.dataset.quantity);
-      const costBasis = qty * buyPrice;
-      totalInvested += costBasis;
-
-      if (!entry || entry.price == null) return;
-
-      const price = entry.price;
-      const curValue = qty * price;
-      const retDollar = curValue - costBasis;
-      const retPct = ((price - buyPrice) / buyPrice) * 100;
-      totalValue += curValue;
-
-      row.querySelector('.cell-cur-price').textContent = '$' + fmt(price);
-      row.querySelector('.cell-cur-value').textContent = '$' + fmt(curValue);
-
-      const rdCell = row.querySelector('.cell-return-dollar');
-      rdCell.textContent = fmtDollar(retDollar);
-      rdCell.className = 'num cell-return-dollar ' + (retDollar >= 0 ? 'positive' : 'negative');
-
-      const rpCell = row.querySelector('.cell-return-pct');
-      rpCell.textContent = fmtPct(retPct);
-      rpCell.className = 'num cell-return-pct ' + (retPct >= 0 ? 'positive' : 'negative');
-
-      row.querySelector('.cell-updated').textContent =
-        new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const d = assetRows[id];
+      if (!d) return;
+      assetTotal += d.curValue || 0;
+      if (d.curPrice != null) row.querySelector('.cell-cur-price').textContent = fmtMoney(d.curPrice);
+      if (d.curValue != null) row.querySelector('.cell-cur-value').textContent = fmtMoney(d.curValue);
+      if (d.retDollar != null) {
+        const rdCell = row.querySelector('.cell-return-dollar');
+        rdCell.textContent = fmtReturn(d.retDollar);
+        rdCell.className = 'num cell-return-dollar ' + (d.retDollar >= 0 ? 'positive' : 'negative');
+      }
     });
 
-    // Store asset total value for combined update
-    window._assetTotalValue = totalValue;
-    window._assetTotalInvested = totalInvested;
-    updatePortfolioSummary();
+    let walletTotal = 0;
+    document.querySelectorAll('tr[data-wallet-id]').forEach(row => {
+      const id = row.dataset.walletId;
+      const usd = walletRows[id];
+      if (usd != null) {
+        walletTotal += usd;
+        row.querySelector('.cell-wallet-usd').textContent = fmtMoney(usd);
+      }
+    });
 
-    if (liveStatus) liveStatus.textContent = new Date().toLocaleTimeString();
-    setTimeout(refreshPrices, 2000);
-  }
+    const combined = assetTotal + walletTotal;
+    const retDollar = assetTotal - totalInvested;
+    const retPct = totalInvested > 0 ? (retDollar / totalInvested) * 100 : 0;
 
-  function updatePortfolioSummary() {
-    const assetValue = window._assetTotalValue || 0;
-    const walletValue = window._walletTotalUsd || 0;
-    const totalInvested = window._assetTotalInvested || 0;
-    const combined = assetValue + walletValue;
-    const totalReturn = assetValue - totalInvested;
-    const totalReturnPct = totalInvested > 0 ? (totalReturn / totalInvested) * 100 : 0;
-
+    const cardInvested = document.getElementById('card-total-invested');
     const cardTotal = document.getElementById('card-total-value');
     const cardWallet = document.getElementById('card-wallet-value');
     const cardRetDollar = document.getElementById('card-return-dollar');
     const cardRetPct = document.getElementById('card-return-pct');
 
-    if (cardTotal) cardTotal.textContent = '$' + fmt(combined);
-    if (cardWallet) cardWallet.textContent = '$' + fmt(walletValue);
+    if (cardInvested) cardInvested.textContent = fmtMoney(totalInvested);
+    if (cardTotal) cardTotal.textContent = fmtMoney(combined);
+    if (cardWallet) cardWallet.textContent = fmtMoney(walletTotal);
     if (cardRetDollar) {
-      cardRetDollar.textContent = fmtDollar(totalReturn);
-      cardRetDollar.className = 'card-value ' + (totalReturn >= 0 ? 'positive' : 'negative');
+      cardRetDollar.textContent = fmtReturn(retDollar);
+      cardRetDollar.className = 'card-value ' + (retDollar >= 0 ? 'positive' : 'negative');
     }
     if (cardRetPct) {
-      cardRetPct.textContent = fmtPct(totalReturnPct);
-      cardRetPct.className = 'card-value ' + (totalReturnPct >= 0 ? 'positive' : 'negative');
+      cardRetPct.textContent = fmtPct(retPct);
+      cardRetPct.className = 'card-value ' + (retPct >= 0 ? 'positive' : 'negative');
     }
   }
 
+  // ─── Price polling ────────────────────────────────────────────────────────
+  async function refreshPrices() {
+    let data;
+    try {
+      const res = await fetch('/api/prices?t=' + Date.now());
+      if (!res.ok) throw new Error('bad status');
+      data = await res.json();
+    } catch (e) {
+      setTimeout(refreshPrices, 5000);
+      return;
+    }
+
+    totalInvested = 0;
+    document.querySelectorAll('tr[data-asset-id]').forEach(row => {
+      const id = row.dataset.assetId;
+      const buyPrice = parseFloat(row.dataset.buyPrice);
+      const qty = parseFloat(row.dataset.quantity);
+      totalInvested += qty * buyPrice;
+      const entry = data[id];
+      if (!entry || entry.price == null) return;
+      const curValue = qty * entry.price;
+      const retDollar = curValue - (qty * buyPrice);
+      const retPct = ((entry.price - buyPrice) / buyPrice) * 100;
+      assetRows[id] = { curPrice: entry.price, curValue, retDollar, retPct };
+    });
+
+    renderAllValues();
+    setTimeout(refreshPrices, 30000);
+  }
+
+  // ─── Wallet polling ───────────────────────────────────────────────────────
   async function refreshWallets() {
     let data;
     try {
@@ -375,32 +378,21 @@
       if (!res.ok) throw new Error('bad status');
       data = await res.json();
     } catch (e) {
-      setTimeout(refreshWallets, 10000);
+      setTimeout(refreshWallets, 30000);
       return;
     }
 
-    let walletTotal = 0;
     data.forEach(w => {
       const row = document.querySelector(`tr[data-wallet-id="${w.id}"]`);
       if (!row) return;
       if (w.btc != null) row.querySelector('.cell-btc-balance').textContent = w.btc.toFixed(8);
       if (w.unconfirmed != null) row.querySelector('.cell-btc-unconfirmed').textContent = w.unconfirmed.toFixed(8);
-      if (w.usd != null) {
-        row.querySelector('.cell-wallet-usd').textContent = '$' + fmt(w.usd);
-        walletTotal += w.usd;
-      }
-      row.querySelector('.cell-wallet-updated').textContent =
-        new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      if (w.usd != null) walletRows[w.id] = w.usd;
     });
 
-    window._walletTotalUsd = walletTotal;
-    updatePortfolioSummary();
-    setTimeout(refreshWallets, 10000);
+    renderAllValues();
+    setTimeout(refreshWallets, 60000);
   }
-
-  window._assetTotalValue = 0;
-  window._assetTotalInvested = 0;
-  window._walletTotalUsd = 0;
 
   refreshPrices();
   refreshWallets();

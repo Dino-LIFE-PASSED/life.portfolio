@@ -1,11 +1,89 @@
 const express = require('express');
 const path = require('path');
+const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const session = require('express-session');
 const pgSession = require('connect-pg-simple')(session);
+const HDKey = require('hdkey');
+const bs58check = require('bs58check');
+const { bech32 } = require('bech32');
 const { pool, initDb, createUser, getUserByUsername,
         getAllAssets, getAssetById, addAsset, updateAsset, deleteAsset, updatePrice,
         getAllWallets, addWallet, deleteWallet, updateWalletBalance } = require('./db');
+
+// ─── xPub address derivation ─────────────────────────────────────────────────
+
+function hash160(buf) {
+  const sha = crypto.createHash('sha256').update(buf).digest();
+  return crypto.createHash('ripemd160').update(sha).digest();
+}
+
+function xpubToAddress(pubKey, type) {
+  const h160 = hash160(pubKey);
+  if (type === 'zpub') {
+    // P2WPKH native segwit (bc1q...)
+    const words = bech32.toWords(h160);
+    return bech32.encode('bc', [0x00, ...words]);
+  } else if (type === 'ypub') {
+    // P2SH-P2WPKH wrapped segwit (3...)
+    const redeemScript = Buffer.concat([Buffer.from([0x00, 0x14]), h160]);
+    const scriptHash = hash160(redeemScript);
+    return bs58check.encode(Buffer.concat([Buffer.from([0x05]), scriptHash]));
+  } else {
+    // P2PKH legacy (1...)
+    return bs58check.encode(Buffer.concat([Buffer.from([0x00]), h160]));
+  }
+}
+
+function normalizeXpub(extKey) {
+  // Convert ypub/zpub to xpub version bytes for HDKey parsing
+  const raw = bs58check.decode(extKey);
+  const buf = Buffer.from(raw);
+  buf.writeUInt32BE(0x0488b21e, 0); // standard xpub version
+  return bs58check.encode(buf);
+}
+
+function isXpub(str) {
+  return /^[xyz]pub/.test(str);
+}
+
+async function scanXpub(xpubStr) {
+  const type = xpubStr.slice(0, 4); // xpub, ypub, zpub
+  const normalized = (type === 'xpub') ? xpubStr : normalizeXpub(xpubStr);
+  const master = HDKey.fromExtendedKey(normalized);
+  const external = master.derive('m/0'); // external chain
+
+  const GAP_LIMIT = 20;
+  let gap = 0;
+  let index = 0;
+  let totalSats = 0;
+
+  while (gap < GAP_LIMIT) {
+    const child = external.deriveChild(index);
+    const address = xpubToAddress(child.publicKey, type);
+
+    try {
+      const r = await fetch(`https://mempool.space/api/address/${address}`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const d = await r.json();
+      const txCount = d.chain_stats.tx_count + d.mempool_stats.tx_count;
+      const balance = d.chain_stats.funded_txo_sum - d.chain_stats.spent_txo_sum
+                    + d.mempool_stats.funded_txo_sum - d.mempool_stats.spent_txo_sum;
+      if (txCount === 0) {
+        gap++;
+      } else {
+        gap = 0;
+        totalSats += balance;
+      }
+    } catch (err) {
+      console.error(`xpub scan error at index ${index}:`, err.message);
+      gap++;
+    }
+    index++;
+  }
+
+  return totalSats / 1e8; // satoshis → BTC
+}
 
 const app = express();
 const PORT = 3000;
@@ -249,8 +327,12 @@ app.post('/delete/:id', requireAuth, async (req, res) => {
 app.post('/wallet/add', requireAuth, async (req, res) => {
   const { label, address } = req.body;
   if (!label || !address) return res.redirect('/?error=Label+and+address+required');
+  const input = address.trim();
+  if (!isXpub(input) && !input.match(/^(1|3|bc1)[a-zA-Z0-9]{20,}/)) {
+    return res.redirect('/?error=Invalid+Bitcoin+address+or+xPub');
+  }
   try {
-    await addWallet(req.session.userId, label.trim(), address.trim());
+    await addWallet(req.session.userId, label.trim(), input);
     res.redirect('/?success=Wallet+added');
   } catch (err) {
     const msg = err.message.includes('unique') || err.message.includes('UNIQUE')
@@ -281,23 +363,45 @@ app.get('/api/wallets', requireAuth, async (req, res) => {
   const now = new Date().toISOString();
   const results = await Promise.all(wallets.map(async (w) => {
     try {
-      const r = await fetch(`https://mempool.space/api/address/${w.address}`);
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      const d = await r.json();
-      const btc = (d.chain_stats.funded_txo_sum - d.chain_stats.spent_txo_sum) / 1e8;
-      const unconfirmed = (d.mempool_stats.funded_txo_sum - d.mempool_stats.spent_txo_sum) / 1e8;
+      let btc, unconfirmed;
+
+      if (isXpub(w.address)) {
+        // xpub/ypub/zpub: scan all derived addresses
+        btc = await scanXpub(w.address);
+        unconfirmed = 0;
+      } else {
+        // Single address
+        const r = await fetch(`https://mempool.space/api/address/${w.address}`);
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const d = await r.json();
+        btc = (d.chain_stats.funded_txo_sum - d.chain_stats.spent_txo_sum) / 1e8;
+        unconfirmed = (d.mempool_stats.funded_txo_sum - d.mempool_stats.spent_txo_sum) / 1e8;
+      }
+
       const usd = btcUsd != null ? btc * btcUsd : null;
       await updateWalletBalance(w.id, btc, unconfirmed, usd, now);
-      return { id: w.id, label: w.label, address: w.address, btc, unconfirmed, usd, updated: now };
+      return { id: w.id, label: w.label, address: w.address, btc, unconfirmed, usd };
     } catch (err) {
       console.error(`Wallet fetch failed for ${w.address}:`, err.message);
       return { id: w.id, label: w.label, address: w.address,
-               btc: w.btc_balance, unconfirmed: w.btc_unconfirmed,
-               usd: w.usd_value, updated: w.last_updated };
+               btc: w.btc_balance, unconfirmed: w.btc_unconfirmed, usd: w.usd_value };
     }
   }));
 
   res.json(results);
+});
+
+// GET /api/rates — USD to THB exchange rate
+app.get('/api/rates', requireAuth, async (_req, res) => {
+  try {
+    const r = await fetch('https://api.frankfurter.app/latest?from=USD&to=THB');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    res.json({ usdToThb: data.rates.THB });
+  } catch (err) {
+    console.error('Rate fetch failed:', err.message);
+    res.status(502).json({ error: 'Could not fetch exchange rate' });
+  }
 });
 
 // Shared price fetcher
