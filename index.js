@@ -468,10 +468,7 @@ app.get('/api/wallets', requireAuth, async (req, res) => {
   if (wallets.length === 0) return res.json([]);
 
   let btcUsd = null;
-  try {
-    const r = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd');
-    if (r.ok) btcUsd = (await r.json()).bitcoin.usd;
-  } catch (_) {}
+  try { btcUsd = await fetchPrice('BTC-USD'); } catch (_) {}
 
   const now = new Date().toISOString();
   const results = await Promise.all(wallets.map(async (w) => {
@@ -505,11 +502,18 @@ app.get('/api/wallets', requireAuth, async (req, res) => {
     }
   }));
 
-  // Sync total BTC across all wallets into the auto Bitcoin asset
+  // Sync total BTC + Yahoo price into the auto Bitcoin asset (same source as /api/prices)
   const totalBtc = results.reduce((s, w) => s + (w.btc || 0), 0);
   if (totalBtc > 0) {
-    try { await upsertWalletBtcAsset(req.session.userId, totalBtc); }
-    catch (err) { console.error('[wallets] upsertWalletBtcAsset error:', err.message); }
+    try {
+      await upsertWalletBtcAsset(req.session.userId, totalBtc);
+      if (btcUsd != null) {
+        const { rows } = await pool.query(
+          'SELECT id FROM assets WHERE user_id = $1 AND is_wallet_btc = true', [req.session.userId]
+        );
+        if (rows[0]) await updatePrice(rows[0].id, btcUsd, now);
+      }
+    } catch (err) { console.error('[wallets] btc asset sync error:', err.message); }
   }
 
   res.json(results);
