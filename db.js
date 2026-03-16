@@ -44,6 +44,7 @@ async function initDb() {
     ALTER TABLE assets ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE;
     ALTER TABLE wallets ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE;
     ALTER TABLE wallets DROP CONSTRAINT IF EXISTS wallets_address_key;
+    ALTER TABLE assets ADD COLUMN IF NOT EXISTS is_wallet_btc BOOLEAN DEFAULT false;
   `);
 
   // Add unique constraint per user if not exists
@@ -159,6 +160,23 @@ async function deleteWallet(id, userId) {
   await pool.query('DELETE FROM wallets WHERE id = $1 AND user_id = $2', [id, userId]);
 }
 
+async function upsertWalletBtcAsset(userId, totalBtc) {
+  const { rows } = await pool.query(
+    'SELECT id FROM assets WHERE user_id = $1 AND is_wallet_btc = true',
+    [userId]
+  );
+  const today = new Date().toISOString().split('T')[0];
+  if (rows.length > 0) {
+    await pool.query('UPDATE assets SET quantity = $1 WHERE id = $2', [totalBtc, rows[0].id]);
+  } else {
+    await pool.query(
+      `INSERT INTO assets (user_id, name, ticker, asset_type, quantity, buy_price, buy_date, is_wallet_btc)
+       VALUES ($1, 'Bitcoin', 'BTC-USD', 'crypto', $2, 0, $3, true)`,
+      [userId, totalBtc, today]
+    );
+  }
+}
+
 async function updateWalletBalance(id, btc_balance, btc_unconfirmed, usd_value, last_updated) {
   await pool.query(
     'UPDATE wallets SET btc_balance=$1, btc_unconfirmed=$2, usd_value=$3, last_updated=$4 WHERE id=$5',
@@ -171,5 +189,5 @@ module.exports = {
   initDb,
   createUser, getUserByUsername, updateUserProfile,
   getAllAssets, getAssetById, addAsset, updateAsset, deleteAsset, updatePrice,
-  getAllWallets, addWallet, updateWalletLabel, deleteWallet, updateWalletBalance,
+  getAllWallets, addWallet, updateWalletLabel, deleteWallet, updateWalletBalance, upsertWalletBtcAsset,
 };

@@ -50,8 +50,8 @@
     <p class="card-label">Wallet Holdings</p>
     <p class="card-value" id="card-wallet-value"><%
       const walletUsd = wallets.reduce((s, w) => s + (w.usd_value || 0), 0);
-    %>$<%= fmt(walletUsd) %></p>
-    <p class="card-sub"><%= wallets.length %> wallet<%= wallets.length !== 1 ? 's' : '' %></p>
+    %><%= hasBtcAsset ? '—' : '$' + fmt(walletUsd) %></p>
+    <p class="card-sub"><%= wallets.length %> wallet<%= wallets.length !== 1 ? 's' : '' %><%= hasBtcAsset ? ' (in Holdings)' : '' %></p>
   </div>
   <div class="card summary-card">
     <p class="card-label">Total Return ($)</p>
@@ -93,18 +93,20 @@
           </thead>
           <tbody>
             <% assets.forEach(function(a) { %>
-            <tr data-asset-id="<%= a.id %>" data-buy-price="<%= a.buy_price %>" data-quantity="<%= a.quantity %>">
+            <tr data-asset-id="<%= a.id %>" data-buy-price="<%= a.buy_price %>" data-quantity="<%= a.quantity %>"<% if (a.is_wallet_btc) { %> data-auto-btc="1"<% } %>>
               <td class="action-col">
+                <% if (!a.is_wallet_btc) { %>
                 <form action="/delete/<%= a.id %>" method="POST" onsubmit="return confirm('Delete <%= a.name %>?')" style="display:inline">
                   <button type="submit" class="btn-delete" title="Delete">&#10005;</button>
                 </form>
+                <% } %>
                 <a href="/edit/<%= a.id %>" class="btn-edit" title="Edit">&#9998;</a>
               </td>
-              <td class="asset-name"><%= a.name %></td>
+              <td class="asset-name"><%= a.name %><% if (a.is_wallet_btc) { %> <span class="auto-btc-badge">wallet</span><% } %></td>
               <td><span class="ticker-badge"><%= a.ticker %></span></td>
               <td><span class="type-badge type-<%= a.asset_type %>"><%= a.asset_type.toUpperCase() %></span></td>
-              <td class="num"><%= a.quantity %></td>
-              <td class="num cell-buy-price">$<%= fmt(a.buy_price) %></td>
+              <td class="num"><%= a.quantity.toFixed(8) %></td>
+              <td class="num cell-buy-price"><% if (a.is_wallet_btc && a.buy_price === 0) { %><a href="/edit/<%= a.id %>" class="set-cost-link">Set cost</a><% } else { %>$<%= fmt(a.buy_price) %><% } %></td>
               <td class="num cell-cur-price"><%= a.current_price != null ? '$' + fmt(a.current_price) : '—' %></td>
               <td class="num cell-cur-value"><%= a.current_value != null ? '$' + fmt(a.current_value) : '—' %></td>
               <td class="num cell-return-dollar <%= signClass(a.return_dollar) %>"><%= fmtDollar(a.return_dollar) %></td>
@@ -136,7 +138,12 @@
   <div class="card table-card">
     <div class="card-header">
       <h2 class="card-title">&#8383; Bitcoin Wallets</h2>
-      <button class="btn btn-sm btn-primary" onclick="document.getElementById('wallet-form').classList.toggle('hidden')">+ Add Wallet</button>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <% if (wallets.length > 0) { %>
+        <button id="walletViewToggle" class="btn btn-sm btn-ghost" title="Cycle wallet view"></button>
+        <% } %>
+        <button class="btn btn-sm btn-primary" onclick="document.getElementById('wallet-form').classList.toggle('hidden')">+ Add Wallet</button>
+      </div>
     </div>
 
     <div id="wallet-form" class="wallet-add-form hidden">
@@ -154,16 +161,16 @@
     <% if (wallets.length === 0) { %>
       <p class="wallet-empty">No wallets tracked yet. Add a Bitcoin address or xPub above.</p>
     <% } else { %>
-    <div class="table-wrapper">
+    <div id="wallets-table-wrapper" class="table-wrapper" data-wallet-mode="both">
       <table class="assets-table">
         <thead>
           <tr>
             <th></th>
             <th>Label</th>
             <th>Source</th>
-            <th class="num">BTC Balance</th>
-            <th class="num">Unconfirmed</th>
-            <th class="num">Value</th>
+            <th class="num col-btc-balance">BTC Balance</th>
+            <th class="num col-btc-unconfirmed">Unconfirmed</th>
+            <th class="num col-wallet-usd">Value</th>
           </tr>
         </thead>
         <tbody id="wallets-tbody">
@@ -184,9 +191,9 @@
               <% } %>
             </td>
             <% var neverScanned = /^[xyz]pub/.test(w.address) && w.btc_balance == null; %>
-            <td class="num cell-btc-balance"><%= w.btc_balance != null ? w.btc_balance.toFixed(8) : (neverScanned ? 'Scanning…' : '—') %></td>
-            <td class="num cell-btc-unconfirmed" style="color:var(--text-dim)"><%= w.btc_unconfirmed != null ? w.btc_unconfirmed.toFixed(8) : '—' %></td>
-            <td class="num cell-wallet-usd"><%= w.usd_value != null ? '$' + w.usd_value.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) : (neverScanned ? 'Scanning…' : '—') %></td>
+            <td class="num cell-btc-balance col-btc-balance"><%= w.btc_balance != null ? w.btc_balance.toFixed(8) : (neverScanned ? 'Scanning…' : '—') %></td>
+            <td class="num cell-btc-unconfirmed col-btc-unconfirmed" style="color:var(--text-dim)"><%= w.btc_unconfirmed != null ? w.btc_unconfirmed.toFixed(8) : '—' %></td>
+            <td class="num cell-wallet-usd col-wallet-usd"><%= w.usd_value != null ? '$' + w.usd_value.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) : (neverScanned ? 'Scanning…' : '—') %></td>
           </tr>
           <% }); %>
         </tbody>
@@ -202,6 +209,7 @@
 <script>
 // Shared currency state — read by chart tooltip at hover time
 window._currency = { showThb: false, usdToThb: null };
+window._hasBtcAsset = <%- JSON.stringify(hasBtcAsset) %>;
 (function () {
   const chartData = JSON.parse(document.getElementById('chartData').textContent);
   const labels = chartData.labels;
@@ -327,18 +335,30 @@ window._currency = { showThb: false, usdToThb: null };
   let totalInvested = 0;
 
   function renderAllValues() {
-    let assetTotal = 0;
+    let assetTotalFull = 0;  // all assets incl. auto BTC (for portfolio value)
+    let assetTotalPnl = 0;   // only assets with known cost (for P&L)
     document.querySelectorAll('tr[data-asset-id]').forEach(row => {
       const id = row.dataset.assetId;
       const d = assetRows[id];
       if (!d) return;
-      assetTotal += d.curValue || 0;
+      const buyPriceRaw = parseFloat(row.dataset.buyPrice);
+      const isAutoBtcNoCost = row.dataset.autoBtc && buyPriceRaw === 0;
+      assetTotalFull += d.curValue || 0;
+      if (!isAutoBtcNoCost) assetTotalPnl += d.curValue || 0;
       if (d.curPrice != null) row.querySelector('.cell-cur-price').textContent = fmtMoney(d.curPrice);
       if (d.curValue != null) row.querySelector('.cell-cur-value').textContent = fmtMoney(d.curValue);
+      // Convert buy price (skip auto BTC "Set cost" placeholder)
+      const buyCell = row.querySelector('.cell-buy-price');
+      if (buyCell && !isAutoBtcNoCost) buyCell.textContent = fmtMoney(buyPriceRaw);
       if (d.retDollar != null) {
         const rdCell = row.querySelector('.cell-return-dollar');
         rdCell.textContent = fmtReturn(d.retDollar);
         rdCell.className = 'num cell-return-dollar ' + (d.retDollar >= 0 ? 'positive' : 'negative');
+      }
+      if (d.retPct != null) {
+        const rpCell = row.querySelector('.cell-return-pct');
+        rpCell.textContent = fmtPct(d.retPct);
+        rpCell.className = 'num cell-return-pct ' + (d.retPct >= 0 ? 'positive' : 'negative');
       }
     });
 
@@ -347,13 +367,13 @@ window._currency = { showThb: false, usdToThb: null };
       const id = row.dataset.walletId;
       const usd = walletRows[id];
       if (usd != null) {
-        walletTotal += usd;
+        if (!window._hasBtcAsset) walletTotal += usd;
         row.querySelector('.cell-wallet-usd').textContent = fmtMoney(usd);
       }
     });
 
-    const combined = assetTotal + walletTotal;
-    const retDollar = assetTotal - totalInvested;
+    const portfolioValue = assetTotalFull + walletTotal;
+    const retDollar = assetTotalPnl - totalInvested;
     const retPct = totalInvested > 0 ? (retDollar / totalInvested) * 100 : 0;
 
     const cardInvested = document.getElementById('card-total-invested');
@@ -363,8 +383,8 @@ window._currency = { showThb: false, usdToThb: null };
     const cardRetPct = document.getElementById('card-return-pct');
 
     if (cardInvested) cardInvested.textContent = fmtMoney(totalInvested);
-    if (cardTotal) cardTotal.textContent = fmtMoney(combined);
-    if (cardWallet) cardWallet.textContent = fmtMoney(walletTotal);
+    if (cardTotal) cardTotal.textContent = fmtMoney(portfolioValue);
+    if (cardWallet) cardWallet.textContent = window._hasBtcAsset ? '—' : fmtMoney(walletTotal);
     if (cardRetDollar) {
       cardRetDollar.textContent = fmtReturn(retDollar);
       cardRetDollar.className = 'card-value ' + (retDollar >= 0 ? 'positive' : 'negative');
@@ -392,13 +412,18 @@ window._currency = { showThb: false, usdToThb: null };
       const id = row.dataset.assetId;
       const buyPrice = parseFloat(row.dataset.buyPrice);
       const qty = parseFloat(row.dataset.quantity);
-      totalInvested += qty * buyPrice;
+      const isAutoBtcNoCost = row.dataset.autoBtc && buyPrice === 0;
+      if (!isAutoBtcNoCost) totalInvested += qty * buyPrice;
       const entry = data[id];
       if (!entry || entry.price == null) return;
       const curValue = qty * entry.price;
-      const retDollar = curValue - (qty * buyPrice);
-      const retPct = ((entry.price - buyPrice) / buyPrice) * 100;
-      assetRows[id] = { curPrice: entry.price, curValue, retDollar, retPct };
+      if (isAutoBtcNoCost) {
+        assetRows[id] = { curPrice: entry.price, curValue, retDollar: null, retPct: null };
+      } else {
+        const retDollar = curValue - (qty * buyPrice);
+        const retPct = ((entry.price - buyPrice) / buyPrice) * 100;
+        assetRows[id] = { curPrice: entry.price, curValue, retDollar, retPct };
+      }
     });
 
     renderAllValues();
@@ -434,6 +459,24 @@ window._currency = { showThb: false, usdToThb: null };
 
   // Strip ?success / ?error from URL so reloading doesn't re-show the alert
   if (window.location.search) history.replaceState(null, '', window.location.pathname);
+})();
+</script>
+
+<script>
+(function() {
+  const MODES = ['both', 'btc', 'usd'];
+  const LABELS = ['BTC + Value', 'BTC Only', 'Value Only'];
+  let modeIdx = parseInt(localStorage.getItem('walletViewMode') || '0', 10);
+  if (isNaN(modeIdx) || modeIdx < 0 || modeIdx > 2) modeIdx = 0;
+  const wrapper = document.getElementById('wallets-table-wrapper');
+  const btn = document.getElementById('walletViewToggle');
+  function applyMode() {
+    if (wrapper) wrapper.dataset.walletMode = MODES[modeIdx];
+    if (btn) btn.textContent = LABELS[modeIdx];
+    localStorage.setItem('walletViewMode', modeIdx);
+  }
+  if (btn) btn.addEventListener('click', function() { modeIdx = (modeIdx + 1) % 3; applyMode(); });
+  applyMode();
 })();
 </script>
 

@@ -9,7 +9,7 @@ const bs58check = require('bs58check');
 const { bech32 } = require('bech32');
 const { pool, initDb, createUser, getUserByUsername, updateUserProfile,
         getAllAssets, getAssetById, addAsset, updateAsset, deleteAsset, updatePrice,
-        getAllWallets, addWallet, updateWalletLabel, deleteWallet, updateWalletBalance } = require('./db');
+        getAllWallets, addWallet, updateWalletLabel, deleteWallet, updateWalletBalance, upsertWalletBtcAsset } = require('./db');
 
 // ─── xPub address derivation ─────────────────────────────────────────────────
 
@@ -143,20 +143,21 @@ function requireAuth(req, res, next) {
 
 function computeStats(assets) {
   const enriched = assets.map((a) => {
-    const cost_basis = a.quantity * a.buy_price;
+    const autoBtcNoCost = a.is_wallet_btc && a.buy_price === 0;
+    const cost_basis = autoBtcNoCost ? null : a.quantity * a.buy_price;
     const current_value =
       a.current_price != null ? a.quantity * a.current_price : null;
     const return_dollar =
-      current_value != null ? current_value - cost_basis : null;
+      (!autoBtcNoCost && current_value != null) ? current_value - cost_basis : null;
     const return_pct =
-      a.current_price != null
+      (!autoBtcNoCost && a.current_price != null && a.buy_price > 0)
         ? ((a.current_price - a.buy_price) / a.buy_price) * 100
         : null;
     return { ...a, cost_basis, current_value, return_dollar, return_pct };
   });
 
   const assetsWithPrice = enriched.filter((a) => a.current_value != null);
-  const total_invested = enriched.reduce((s, a) => s + a.cost_basis, 0);
+  const total_invested = enriched.reduce((s, a) => s + (a.cost_basis || 0), 0);
   const total_value = assetsWithPrice.reduce((s, a) => s + a.current_value, 0);
   const total_return_dollar = total_value - total_invested;
   const total_return_pct =
@@ -313,19 +314,23 @@ app.get('/', requireAuth, async (req, res) => {
   const { enriched, summary, chart } = computeStats(assets);
   const wallets = await getAllWallets(req.session.userId);
 
-  // Add wallets with known USD value to the pie chart
-  wallets.forEach(w => {
-    if (w.usd_value != null && w.usd_value > 0) {
-      chart.labels.push(w.label);
-      chart.values.push(parseFloat(w.usd_value.toFixed(2)));
-    }
-  });
+  // Only add wallet values to chart if no auto BTC asset exists (prevents double-counting)
+  const hasBtcAsset = enriched.some(a => a.is_wallet_btc);
+  if (!hasBtcAsset) {
+    wallets.forEach(w => {
+      if (w.usd_value != null && w.usd_value > 0) {
+        chart.labels.push(w.label);
+        chart.values.push(parseFloat(w.usd_value.toFixed(2)));
+      }
+    });
+  }
 
   res.render('index', {
     assets: enriched,
     summary,
     chart,
     wallets,
+    hasBtcAsset,
     username: req.session.username,
     hasProfileImage: !!req.session.hasProfileImage,
     hasBgGif: !!req.session.hasBgGif,
@@ -499,6 +504,13 @@ app.get('/api/wallets', requireAuth, async (req, res) => {
                btc: w.btc_balance, unconfirmed: w.btc_unconfirmed, usd: w.usd_value };
     }
   }));
+
+  // Sync total BTC across all wallets into the auto Bitcoin asset
+  const totalBtc = results.reduce((s, w) => s + (w.btc || 0), 0);
+  if (totalBtc > 0) {
+    try { await upsertWalletBtcAsset(req.session.userId, totalBtc); }
+    catch (err) { console.error('[wallets] upsertWalletBtcAsset error:', err.message); }
+  }
 
   res.json(results);
 });

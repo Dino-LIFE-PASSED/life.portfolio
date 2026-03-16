@@ -1037,4 +1037,28 @@ input[type="number"]::-webkit-outer-spin-button {
   align-items: center;
 }
 .upload-row .form-input { flex: 1; }
+
+/* ─── Wallet view modes ─────────────────────────────────────────────────── */
+[data-wallet-mode="btc"] .col-wallet-usd { display: none; }
+[data-wallet-mode="usd"] .col-btc-balance,
+[data-wallet-mode="usd"] .col-btc-unconfirmed { display: none; }
+
+/* ─── Auto BTC asset badges ─────────────────────────────────────────────── */
+.auto-btc-badge {
+  font-size: 10px;
+  background: rgba(108, 99, 255, 0.18);
+  color: var(--accent);
+  border: 1px solid rgba(108, 99, 255, 0.3);
+  border-radius: 4px;
+  padding: 1px 5px;
+  vertical-align: middle;
+  margin-left: 4px;
+}
+.set-cost-link {
+  color: var(--accent);
+  font-size: 12px;
+  text-decoration: none;
+  border-bottom: 1px dashed var(--accent);
+}
+.set-cost-link:hover { color: var(--accent-hover); }
 .upload-label { cursor: pointer; flex-shrink: 0; }
