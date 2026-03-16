@@ -252,6 +252,15 @@ app.get('/', requireAuth, async (req, res) => {
   const assets = await getAllAssets(req.session.userId);
   const { enriched, summary, chart } = computeStats(assets);
   const wallets = await getAllWallets(req.session.userId);
+
+  // Add wallets with known USD value to the pie chart
+  wallets.forEach(w => {
+    if (w.usd_value != null && w.usd_value > 0) {
+      chart.labels.push(w.label);
+      chart.values.push(parseFloat(w.usd_value.toFixed(2)));
+    }
+  });
+
   res.render('index', {
     assets: enriched,
     summary,

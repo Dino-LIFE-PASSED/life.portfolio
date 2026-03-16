@@ -195,6 +195,7 @@
 </section>
 
 <script type="application/json" id="chartData"><%- JSON.stringify({ labels: chart.labels, values: chart.values }) %></script>
+<script type="application/json" id="walletData"><%- JSON.stringify(wallets.map(w => ({ id: w.id, usd: w.usd_value }))) %></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 <script>
 (function () {
@@ -281,7 +282,10 @@
 
   // ─── Live data stores ─────────────────────────────────────────────────────
   let assetRows = {}; // id → { curValue, retDollar, retPct, buyPrice, qty }
-  let walletRows = {}; // id → usd
+  // Pre-seed wallet values from server-rendered data so first render is correct
+  const _walletSeed = JSON.parse(document.getElementById('walletData').textContent);
+  let walletRows = {};
+  _walletSeed.forEach(w => { if (w.usd != null) walletRows[w.id] = w.usd; });
   let totalInvested = 0;
 
   function renderAllValues() {
