@@ -50,8 +50,8 @@
     <p class="card-label">Wallet Holdings</p>
     <p class="card-value" id="card-wallet-value"><%
       const walletUsd = wallets.reduce((s, w) => s + (w.usd_value || 0), 0);
-    %><%= hasBtcAsset ? '—' : '$' + fmt(walletUsd) %></p>
-    <p class="card-sub"><%= wallets.length %> wallet<%= wallets.length !== 1 ? 's' : '' %><%= hasBtcAsset ? ' (in Holdings)' : '' %></p>
+    %>$<%= fmt(walletUsd) %></p>
+    <p class="card-sub"><%= wallets.length %> wallet<%= wallets.length !== 1 ? 's' : '' %></p>
   </div>
   <div class="card summary-card">
     <p class="card-label">Total Return ($)</p>
@@ -367,12 +367,14 @@ window._hasBtcAsset = <%- JSON.stringify(hasBtcAsset) %>;
       const id = row.dataset.walletId;
       const usd = walletRows[id];
       if (usd != null) {
-        if (!window._hasBtcAsset) walletTotal += usd;
+        walletTotal += usd;
         row.querySelector('.cell-wallet-usd').textContent = fmtMoney(usd);
       }
     });
 
-    const portfolioValue = assetTotalFull + walletTotal;
+    // If auto BTC asset exists, its value already includes wallet BTC — skip wallet total
+    // in portfolio value to avoid double-counting. Wallet Holdings card still shows it.
+    const portfolioValue = assetTotalFull + (window._hasBtcAsset ? 0 : walletTotal);
     const retDollar = assetTotalPnl - totalInvested;
     const retPct = totalInvested > 0 ? (retDollar / totalInvested) * 100 : 0;
 
@@ -384,7 +386,7 @@ window._hasBtcAsset = <%- JSON.stringify(hasBtcAsset) %>;
 
     if (cardInvested) cardInvested.textContent = fmtMoney(totalInvested);
     if (cardTotal) cardTotal.textContent = fmtMoney(portfolioValue);
-    if (cardWallet) cardWallet.textContent = window._hasBtcAsset ? '—' : fmtMoney(walletTotal);
+    if (cardWallet) cardWallet.textContent = fmtMoney(walletTotal);
     if (cardRetDollar) {
       cardRetDollar.textContent = fmtReturn(retDollar);
       cardRetDollar.className = 'card-value ' + (retDollar >= 0 ? 'positive' : 'negative');
