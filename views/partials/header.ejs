@@ -39,12 +39,16 @@
     var streams = [];
 
     function newStream(x) {
+      var len = 7 + Math.floor(Math.random() * 14);
+      var chars = [];
+      for (var k = 0; k <= len; k++) chars.push(CHARS[Math.floor(Math.random() * CHARS.length)]);
       return {
         x: x !== undefined ? x : Math.random() * (c.width - FS),
-        y: -Math.random() * c.height,   /* scatter start heights so they don't all begin at once */
+        y: -Math.random() * c.height,
         speed: 0.8 + Math.random() * 2.2,
-        len: 7 + Math.floor(Math.random() * 14),
-        btc: Math.random() < 0.65   /* 65% of streams are BTC orange */
+        len: len,
+        btc: Math.random() < 0.65,
+        chars: chars   /* fixed characters — same text falls, no flicker */
       };
     }
 
@@ -76,7 +80,7 @@
           var py = s.y - j * FS;
           if (py < 0 || py > c.height) continue;
           var frac = 1 - j / s.len;   /* 0 at tail tip → 1 at head */
-          var ch = CHARS[Math.floor(Math.random() * CHARS.length)];
+          var ch = s.chars[j];
           if (j === 0) {
             /* head: full brightness */
             ctx.fillStyle = s.btc ? '#F7931A' : 'rgba(255,255,255,0.95)';
