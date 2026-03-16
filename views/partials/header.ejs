@@ -28,12 +28,12 @@
 </head>
 <body>
   <% if (typeof hasBgGif !== 'undefined' && hasBgGif) { %>
-  <img id="bg-gif" src="/api/profile/bg" alt="" aria-hidden="true" />
+  <img id="bg-gif" src="/api/profile/bg?t=<%= Date.now() %>" alt="" aria-hidden="true" />
   <% } %>
   <nav class="navbar">
     <div class="nav-brand">
       <% if (typeof hasProfileImage !== 'undefined' && hasProfileImage) { %>
-        <img src="/api/profile/avatar" alt="Profile" class="nav-avatar" />
+        <img src="/api/profile/avatar?t=<%= Date.now() %>" alt="Profile" class="nav-avatar" />
       <% } else { %>
         <span class="nav-logo">&#9682;</span>
       <% } %>
@@ -45,7 +45,7 @@
       <% if (typeof username !== 'undefined' && username) { %>
         <button class="btn-profile" onclick="document.getElementById('profileModal').classList.remove('hidden')" title="Profile settings">
           <% if (typeof hasProfileImage !== 'undefined' && hasProfileImage) { %>
-            <img src="/api/profile/avatar" alt="Profile" class="btn-profile-img" />
+            <img src="/api/profile/avatar?t=<%= Date.now() %>" alt="Profile" class="btn-profile-img" />
           <% } else { %>
             <span class="btn-profile-initial"><%= username[0].toUpperCase() %></span>
           <% } %>

@@ -77,9 +77,14 @@ async function getUserByUsername(username) {
 }
 
 async function updateUserProfile(id, profileImageUrl, bgGifUrl) {
+  // Only overwrite a field if a new value was provided — preserve existing if input is empty
+  const { rows: cur } = await pool.query('SELECT profile_image_url, bg_gif_url FROM users WHERE id=$1', [id]);
+  const existing = cur[0] || {};
+  const newProfile = profileImageUrl || existing.profile_image_url || null;
+  const newBg     = bgGifUrl     || existing.bg_gif_url     || null;
   const { rows } = await pool.query(
     'UPDATE users SET profile_image_url=$1, bg_gif_url=$2 WHERE id=$3 RETURNING profile_image_url, bg_gif_url',
-    [profileImageUrl || null, bgGifUrl || null, id]
+    [newProfile, newBg, id]
   );
   return rows[0];
 }

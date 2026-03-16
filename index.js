@@ -234,7 +234,9 @@ app.post('/register', async (req, res) => {
 // POST /profile
 app.post('/profile', requireAuth, async (req, res) => {
   const { profile_image_url, bg_gif_url } = req.body;
+  console.log(`[profile] user=${req.session.userId} profileLen=${(profile_image_url||'').length} bgLen=${(bg_gif_url||'').length}`);
   const updated = await updateUserProfile(req.session.userId, profile_image_url, bg_gif_url);
+  console.log(`[profile] saved profileLen=${(updated.profile_image_url||'').length} bgLen=${(updated.bg_gif_url||'').length}`);
   req.session.hasProfileImage = !!updated.profile_image_url;
   req.session.hasBgGif = !!updated.bg_gif_url;
   // JSON clients (fetch) get a JSON response; form clients get a redirect
