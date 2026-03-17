@@ -65,15 +65,19 @@
   </div>
 </section>
 
-<% if (assets.length > 0) { %>
+<% if (assets.length === 0) { %>
+  <div class="card" style="text-align:center;padding:48px 24px;">
+    <p style="color:var(--text-muted);margin-bottom:20px;font-size:0.95rem;">No holdings yet. Start tracking your portfolio.</p>
+    <a href="/add" class="btn btn-primary">+ Add Your First Asset</a>
+  </div>
+<% } else { %>
 
-  <section class="dashboard-grid">
+<section class="dashboard-grid">
 
     <!-- Assets Table -->
     <div class="card table-card">
       <div class="card-header">
         <h2 class="card-title">Holdings</h2>
-        <a href="/add" class="btn btn-sm btn-primary">+ Add Asset</a>
       </div>
       <div class="table-wrapper">
         <table class="assets-table">
@@ -131,7 +135,7 @@
 
   </section>
 
-<% } %>
+<% } %><!-- end else (assets exist) -->
 
 <!-- Bitcoin Wallets Section -->
 <section class="wallets-section">
