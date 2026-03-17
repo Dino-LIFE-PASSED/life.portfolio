@@ -457,7 +457,13 @@ app.post('/wallet/edit/:id', requireAuth, async (req, res) => {
 
 // POST /wallet/delete/:id
 app.post('/wallet/delete/:id', requireAuth, async (req, res) => {
-  await deleteWallet(parseInt(req.params.id, 10), req.session.userId);
+  const userId = req.session.userId;
+  await deleteWallet(parseInt(req.params.id, 10), userId);
+  // If no wallets remain, remove the auto BTC asset
+  const remaining = await getAllWallets(userId);
+  if (remaining.length === 0) {
+    await pool.query('DELETE FROM assets WHERE user_id=$1 AND is_wallet_btc=true', [userId]);
+  }
   res.redirect('/?success=Wallet+removed');
 });
 
