@@ -200,6 +200,17 @@
           <button type="submit" class="btn btn-primary">Save</button>
         </div>
       </form>
+      <div style="border-top:1px solid var(--border);margin-top:24px;padding-top:20px;">
+        <p style="color:var(--text-muted);font-size:12px;margin-bottom:12px;">Danger Zone</p>
+        <button id="deleteAccountBtn" class="btn" style="background:transparent;border:1px solid #ff4560;color:#ff4560;width:100%;">Delete Account</button>
+        <div id="deleteAccountConfirm" style="display:none;margin-top:12px;background:rgba(255,69,96,0.08);border:1px solid #ff4560;border-radius:8px;padding:14px;">
+          <p style="color:#ff4560;font-size:13px;margin-bottom:12px;">This will permanently delete your account, all assets, and all wallets. This cannot be undone.</p>
+          <div style="display:flex;gap:8px;">
+            <button id="deleteAccountCancel" class="btn btn-ghost btn-sm" style="flex:1;">Cancel</button>
+            <button id="deleteAccountConfirmBtn" class="btn btn-sm" style="flex:1;background:#ff4560;color:#fff;border:none;">Yes, Delete Everything</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -280,6 +291,21 @@
       });
     });
   })();
+
+  // Delete account flow
+  document.getElementById('deleteAccountBtn').addEventListener('click', function() {
+    document.getElementById('deleteAccountConfirm').style.display = 'block';
+  });
+  document.getElementById('deleteAccountCancel').addEventListener('click', function() {
+    document.getElementById('deleteAccountConfirm').style.display = 'none';
+  });
+  document.getElementById('deleteAccountConfirmBtn').addEventListener('click', function() {
+    this.disabled = true;
+    this.textContent = 'Deleting…';
+    fetch('/account/delete', { method: 'POST' }).then(function() {
+      window.location.href = '/login';
+    });
+  });
   </script>
   <% } %>
 

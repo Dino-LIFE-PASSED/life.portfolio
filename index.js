@@ -240,6 +240,14 @@ app.post('/register', async (req, res) => {
 });
 
 // POST /profile
+app.post('/account/delete', requireAuth, async (req, res) => {
+  const userId = req.session.userId;
+  await pool.query('DELETE FROM wallets WHERE user_id=$1', [userId]);
+  await pool.query('DELETE FROM assets WHERE user_id=$1', [userId]);
+  await pool.query('DELETE FROM users WHERE id=$1', [userId]);
+  req.session.destroy(() => res.json({ ok: true }));
+});
+
 app.post('/profile', requireAuth, async (req, res) => {
   const { profile_image_url, bg_gif_url } = req.body;
   console.log(`[profile] user=${req.session.userId} profileLen=${(profile_image_url||'').length} bgLen=${(bg_gif_url||'').length}`);
