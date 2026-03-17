@@ -209,23 +209,26 @@
 </section>
 
 <script type="application/json" id="chartData"><%- JSON.stringify({ labels: chart.labels, values: chart.values }) %></script>
+<script type="application/json" id="assetMeta"><%- JSON.stringify(assets.map(a => ({ id: a.id, ticker: a.ticker.toUpperCase() }))) %></script>
 <script type="application/json" id="walletData"><%- JSON.stringify(wallets.map(w => ({ id: w.id, usd: w.usd_value }))) %></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 <script>
 // Shared currency state — read by chart tooltip at hover time
 window._currency = { showThb: false, usdToThb: null };
 window._hasBtcAsset = <%- JSON.stringify(hasBtcAsset) %>;
+window._assetMeta = JSON.parse(document.getElementById('assetMeta').textContent);
 (function () {
   const chartData = JSON.parse(document.getElementById('chartData').textContent);
   const labels = chartData.labels;
   const values = chartData.values;
   window._chartIds = chartData.ids || [];
   if (!labels.length) return;
-  const COLORS = [
+  window._chartColors = [
     '#6c63ff','#00e676','#ff9100','#00b0ff','#ff4081',
     '#69f0ae','#ffea00','#40c4ff','#ea80fc','#ff6d00',
     '#b2ff59','#f50057','#18ffff','#ffab40','#e040fb'
   ];
+  const COLORS = window._chartColors;
   const ctx = document.getElementById('allocationChart');
   if (!ctx) return;
   const total = values.reduce((s, v) => s + v, 0);
@@ -407,19 +410,31 @@ window._hasBtcAsset = <%- JSON.stringify(hasBtcAsset) %>;
       document.title = fmtReturn(retDollar) + ' (' + fmtPct(retPct) + ') · life.portfolio';
     }
 
-    // Update pie chart with live prices
-    if (window._allocChart && window._chartIds && window._chartIds.length) {
-      const newValues = window._chartIds.map(id => {
-        const d = assetRows[id];
-        return d && d.curValue != null ? d.curValue : 0;
+    // Rebuild pie chart from live assetRows (picks up newly priced assets too)
+    if (window._allocChart && window._assetMeta && window._chartColors) {
+      const C = window._chartColors;
+      const newLabels = [], newValues = [];
+      window._assetMeta.forEach(a => {
+        const d = assetRows[a.id];
+        if (d && d.curValue > 0) { newLabels.push(a.ticker); newValues.push(d.curValue); }
       });
-      window._allocChart.data.datasets[0].data = newValues;
-      const newTotal = newValues.reduce((s, v) => s + v, 0);
-      const legendItems = document.querySelectorAll('#chartLegend .legend-pct');
-      legendItems.forEach((el, i) => {
-        el.textContent = newTotal > 0 ? ((newValues[i] / newTotal) * 100).toFixed(1) + '%' : '0%';
-      });
-      window._allocChart.update('none');
+      if (newLabels.length) {
+        window._allocChart.data.labels = newLabels;
+        window._allocChart.data.datasets[0].data = newValues;
+        window._allocChart.data.datasets[0].backgroundColor = C.slice(0, newLabels.length);
+        window._allocChart.update('none');
+        const legend = document.getElementById('chartLegend');
+        if (legend) {
+          const total = newValues.reduce((s, v) => s + v, 0);
+          legend.innerHTML = '';
+          newLabels.forEach((label, i) => {
+            const pct = total > 0 ? ((newValues[i] / total) * 100).toFixed(1) : 0;
+            const li = document.createElement('li');
+            li.innerHTML = `<span class="legend-dot" style="background:${C[i % C.length]}"></span><span class="legend-label">${label}</span><span class="legend-pct">${pct}%</span>`;
+            legend.appendChild(li);
+          });
+        }
+      }
     }
   }
 
