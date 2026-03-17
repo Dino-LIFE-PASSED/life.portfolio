@@ -167,6 +167,7 @@ function computeStats(assets) {
   const chartValues = assetsWithPrice.map((a) =>
     parseFloat(a.current_value.toFixed(2))
   );
+  const chartIds = assetsWithPrice.map((a) => a.id);
 
   return {
     enriched,
@@ -177,7 +178,7 @@ function computeStats(assets) {
       total_return_pct,
       asset_count: assets.length,
     },
-    chart: { labels: chartLabels, values: chartValues },
+    chart: { labels: chartLabels, values: chartValues, ids: chartIds },
   };
 }
 

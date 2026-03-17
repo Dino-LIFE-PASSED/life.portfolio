@@ -219,6 +219,7 @@ window._hasBtcAsset = <%- JSON.stringify(hasBtcAsset) %>;
   const chartData = JSON.parse(document.getElementById('chartData').textContent);
   const labels = chartData.labels;
   const values = chartData.values;
+  window._chartIds = chartData.ids || [];
   if (!labels.length) return;
   const COLORS = [
     '#6c63ff','#00e676','#ff9100','#00b0ff','#ff4081',
@@ -228,7 +229,7 @@ window._hasBtcAsset = <%- JSON.stringify(hasBtcAsset) %>;
   const ctx = document.getElementById('allocationChart');
   if (!ctx) return;
   const total = values.reduce((s, v) => s + v, 0);
-  new Chart(ctx, {
+  window._allocChart = new Chart(ctx, {
     type: 'doughnut',
     data: {
       labels,
@@ -404,6 +405,21 @@ window._hasBtcAsset = <%- JSON.stringify(hasBtcAsset) %>;
     // Live tab title — shows total return so you can monitor at a glance
     if (totalInvested > 0) {
       document.title = fmtReturn(retDollar) + ' (' + fmtPct(retPct) + ') · life.portfolio';
+    }
+
+    // Update pie chart with live prices
+    if (window._allocChart && window._chartIds && window._chartIds.length) {
+      const newValues = window._chartIds.map(id => {
+        const d = assetRows[id];
+        return d && d.curValue != null ? d.curValue : 0;
+      });
+      window._allocChart.data.datasets[0].data = newValues;
+      const newTotal = newValues.reduce((s, v) => s + v, 0);
+      const legendItems = document.querySelectorAll('#chartLegend .legend-pct');
+      legendItems.forEach((el, i) => {
+        el.textContent = newTotal > 0 ? ((newValues[i] / newTotal) * 100).toFixed(1) + '%' : '0%';
+      });
+      window._allocChart.update('none');
     }
   }
 
